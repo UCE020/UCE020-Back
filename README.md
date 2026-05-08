@@ -17,11 +17,8 @@ Repositório back-end do **Assinaê**, construído com NestJS e PostgreSQL serve
 
 ## ✅ Pré-requisitos
 
-Antes de começar, certifique-se de ter instalado:
-
-- [Node.js](https://nodejs.org/) v18+
-- npm v9+
-- Conta e banco criado no [Neon.tech](https://neon.tech/)
+- [Node.js](https://nodejs.org/) v22+
+- npm v11+
 
 ---
 
@@ -131,3 +128,38 @@ Resposta esperada:
 ```
 
 Se esse JSON aparecer, o NestJS e o banco de dados estão conectados corretamente. ✅
+
+
+## 🌿 Fluxo de Trabalho (Git)
+
+### Branches
+
+| Branch | Descrição |
+|--------|-----------|
+| `main` | Produção — nunca commitar direto |
+| `dev`  | Desenvolvimento — base para todas as tasks |
+
+### Criando sua branch
+
+Sempre a partir da `dev`:
+
+```bash
+git checkout dev
+git pull origin dev
+git checkout -b task/nome-da-task
+```
+
+Exemplos de nomes:
+- `task/criar-modulo-usuarios`
+- `task/configurar-autenticacao`
+- `task/corrigir-health-check`
+
+### Abrindo o Pull Request
+
+Ao finalizar, suba a branch e abra o PR:
+
+```bash
+git push origin task/nome-da-task
+```
+
+Depois acesse o repositório no GitHub e abra um **Pull Request** de `task/nome-da-task` → `dev`.
