@@ -95,6 +95,8 @@ npm run db:studio
 ---
 
 ## 📂 Estrutura do Projeto
+
+```bash
 src/
 ├── db/
 │   ├── index.ts        # Conexão com o banco
@@ -107,6 +109,7 @@ src/
 └── main.ts             # Entry point da aplicação
 test/
 └── ...                 # Testes unitários e de integração
+```
 
 ---
 
