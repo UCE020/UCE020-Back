@@ -24,8 +24,12 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Executar Linter
+        run: npm run lint
+
       - name: Executar testes unitários
         run: npm run test
+        run: npm run test -- --passWithNoTests
         
       - name: Checar o build
         run: npm run build
