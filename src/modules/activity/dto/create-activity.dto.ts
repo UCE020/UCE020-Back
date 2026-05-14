@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsString, IsNumber, Min, IsOptional, isEnum, IsEnum } from 'class-validator';
-import { categoriaAtividadeEnum } from 'src/db/schema/schema';
+import { categoriaAtividadeEnum } from 'src/db/schema';
 
 export class CreateActivityDto {
   @IsString()
