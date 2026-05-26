@@ -20,9 +20,15 @@ export class AppService {
         data: result.rows[0],
       };
     } catch (error) {
+      if (error instanceof Error){
+        return {
+          status: 'error',
+          message: error.message,
+        };
+      }
       return {
         status: 'error',
-        message: error.message,
+        message: 'Unknown error',
       };
     }
   }
