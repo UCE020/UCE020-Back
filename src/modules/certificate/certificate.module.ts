@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { CertificateController } from './controller/certificate.controller';
-import { CertificateService } from './service/certificate.service';
+import { CertificateController } from './certificate.controller';
+import { CertificateService } from './certificate.service';
 
 @Module({
   controllers: [CertificateController],

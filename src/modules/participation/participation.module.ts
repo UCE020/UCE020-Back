@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ParticipationController } from './controller/participation.controller';
-import { ParticipationService } from './service/participation.service';
+import { ParticipationController } from './participation.controller';
+import { ParticipationService } from './participation.service';
 
 @Module({
   controllers: [ParticipationController],

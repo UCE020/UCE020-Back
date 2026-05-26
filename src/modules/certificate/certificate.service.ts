@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CreateCertificateDto } from '../dto/create-certificate.dto';
-import { UpdateCertificateDto } from '../dto/update-certificate.dto';
+import { CreateCertificateDto } from './dto/create-certificate.dto';
+import { UpdateCertificateDto } from './dto/update-certificate.dto';
 
 @Injectable()
 export class CertificateService {

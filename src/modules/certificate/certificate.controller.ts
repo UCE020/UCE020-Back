@@ -7,9 +7,9 @@ import {
   Param,
   Delete,
 } from '@nestjs/common';
-import { CertificateService } from '../service/certificate.service';
-import { CreateCertificateDto } from '../dto/create-certificate.dto';
-import { UpdateCertificateDto } from '../dto/update-certificate.dto';
+import { CertificateService } from './certificate.service';
+import { CreateCertificateDto } from './dto/create-certificate.dto';
+import { UpdateCertificateDto } from './dto/update-certificate.dto';
 
 @Controller('certificate')
 export class CertificateController {

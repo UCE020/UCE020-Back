@@ -10,12 +10,15 @@ import { EmailModule } from '../email/email.module';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from 'src/config/env.validation';
 import { ActivityModule } from '../activity/activity.module';
+import databaseConfig from '../../config/database.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validationSchema: envValidationSchema
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+      validationSchema: envValidationSchema,
+      load: [databaseConfig],
     }),
     AuthModule,
     UserModule,

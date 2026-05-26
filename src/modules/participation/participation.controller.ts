@@ -7,9 +7,9 @@ import {
   Param,
   Delete,
 } from '@nestjs/common';
-import { ParticipationService } from '../service/participation.service';
-import { CreateParticipationDto } from '../dto/create-participation.dto';
-import { UpdateParticipationDto } from '../dto/update-participation.dto';
+import { ParticipationService } from './participation.service';
+import { CreateParticipationDto } from './dto/create-participation.dto';
+import { UpdateParticipationDto } from './dto/update-participation.dto';
 
 @Controller('participation')
 export class ParticipationController {
