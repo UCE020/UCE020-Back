@@ -103,6 +103,9 @@ src/
 │   └── schema.ts       # Definição das tabelas
 ├── modules/
 │   └── [recurso]/
+│       ├── dto/
+│       │   ├── create-[recurso].dto.ts
+│       │   └── update-[recurso].dto.ts
 │       ├── [recurso].controller.ts
 │       ├── [recurso].service.ts
 │       └── [recurso].module.ts
@@ -116,7 +119,7 @@ test/
 ## 🧪 Verificando o Setup
 
 Com a aplicação rodando, acesse:
-GET http://localhost:3000/health
+GET http://localhost:3000/api/v1/health
 
 Resposta esperada:
 
