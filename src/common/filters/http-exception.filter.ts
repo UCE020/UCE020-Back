@@ -15,15 +15,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const body = exception.getResponse();
 
-    // class-validator devolve um objeto com array de messages
     const message =
       typeof body === 'object' && body !== null && 'message' in body
-        ? String((body as Record<string, unknown>).message)
+        ? (body as Record<string, any>).message
         : exception.message;
 
     response.status(status).json({
-      error: message,
       statusCode: status,
+      error: message,
       path: request.url,
       timestamp: new Date().toISOString(),
     });
