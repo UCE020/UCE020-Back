@@ -19,6 +19,8 @@ export const tabelaUsuario = pgTable("usuario", {
   nome: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
   senha: text("senha").notNull(),
+  resetPasswordToken: text('reset_password_token'),
+  resetPasswordExpires: timestamp('reset_password_expires'),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),

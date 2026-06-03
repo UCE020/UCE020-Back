@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@nestjs-modules/mailer": "^2.3.6",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -37,6 +38,7 @@
     "class-validator": "^0.14.0",
     "drizzle-orm": "^0.45.2",
     "joi": "^18.2.1",
+    "nodemailer": "^8.0.10",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -52,6 +54,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.0",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.0.0",
     "dotenv": "^17.4.2",
