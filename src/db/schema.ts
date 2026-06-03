@@ -7,7 +7,6 @@ import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/
 //Enuns 
 export const funcaoConvidadoEnum = pgEnum("funcao_convidado", ["palestrante", "ministrante", "moderador"]);
 export const categoriaAtividadeEnum = pgEnum("categoria_atividade", ["curso", "minicurso", "palestra", "oficina", "mesa_redonda", "outro"]);
-export const userSexEnum = pgEnum("user_sex", ["masculino", "feminino"]);
 export const statusEnum = pgEnum("status", ["pendente", "iniciada", "andamento", "finalizada"]);
 export const tipoParticipanteEnum = pgEnum("tipo_participante", ["participante", "organizador", "monitor"]);
 
@@ -19,7 +18,9 @@ export const tabelaUsuario = pgTable("usuario", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   nome: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
-  sexo: userSexEnum("sexo").notNull(),
+  senha: text("senha").notNull(),
+  resetPasswordToken: text('reset_password_token'),
+  resetPasswordExpires: timestamp('reset_password_expires'),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
