@@ -11,7 +11,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: configService.get<string>(
@@ -24,7 +24,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         transport: {
           host: configService.get<string>('MAIL_HOST'),
           port: configService.get<number>('MAIL_PORT'),
