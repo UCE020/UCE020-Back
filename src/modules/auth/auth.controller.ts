@@ -17,6 +17,15 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 
+interface RequestWithUser extends Request {
+  user: {
+    id: string;
+    nome: string;
+    email: string;
+    isActive: boolean;
+  };
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -75,7 +84,7 @@ export class AuthController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async getMe(@Req() req) {
+  getMe(@Req() req: RequestWithUser) {
     return {
       message: 'Token válido!',
       user: req.user,
