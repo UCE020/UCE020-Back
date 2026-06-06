@@ -5,6 +5,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyCodeDto } from './dto/verify-code.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -39,5 +40,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Confirma a nova senha utilizando o token recebido' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('verify-code')
+  @ApiOperation({ summary: 'Verifica o código de confirmação enviado por e-mail' })
+  async verifyCode(@Body() verifyDto: VerifyCodeDto) {
+    return this.authService.verifyCode(verifyDto);
   }
 }

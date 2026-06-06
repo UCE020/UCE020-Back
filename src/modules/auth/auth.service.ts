@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { eq, or, and, gt } from 'drizzle-orm';
@@ -16,6 +17,7 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyCodeDto } from './dto/verify-code.dto';
 
 @Injectable()
 export class AuthService {
@@ -41,22 +43,44 @@ export class AuthService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString();
+    const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
     const [newUser] = await db
       .insert(tabelaUsuario)
       .values({
         nome: name,
         email: email,
         senha: hashedPassword,
+        isActive: false,
+        verificationCode: verificationCode,
+        codeExpiresAt: codeExpiresAt,
       })
       .returning({
         id: tabelaUsuario.id,
-        nome: tabelaUsuario.nome,
+        name: tabelaUsuario.nome,
         email: tabelaUsuario.email,
       });
 
+    await this.mailerService.sendMail({
+      to: registerDto.email,
+      subject: 'Confirme seu cadastro - Assinaê',
+      html: `
+      <div style="font-family: sans-serif; padding: 20px;">
+        <h2>Bem-vindo ao Assinaê!</h2>
+        <p>Seu código de confirmação é:</p>
+        <h1 style="letter-spacing: 5px; color: #4F46E5;">${verificationCode}</h1>
+        <p>Este código expira em 15 minutos.</p>
+      </div>
+    `,
+    });
+
     return {
-      message: 'Usuário cadastrado com sucesso!',
-      data: newUser,
+      message:
+        'Usuário cadastrado com sucesso! Confira seu e-mail para o código de confirmação.',
+      data: { user: newUser },
     };
   }
 
@@ -73,16 +97,31 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'Sua conta ainda não foi ativada. Verifique seu e-mail com o código de confirmação.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.senha);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    const payload = { sub: user.id, email: user.email, nome: user.nome };
+    const payload = { sub: user.id, email: user.email };
+    const access_token = await this.jwtService.signAsync(payload);
 
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      message: 'Usuário autenticado com sucesso.',
+      data: {
+        user: {
+          id: user.id,
+          name: user.nome,
+          email: user.email,
+        },
+        access_token,
+      },
     };
   }
 
@@ -166,6 +205,59 @@ export class AuthService {
     return {
       message: 'Senha alterada com sucesso! Você já pode fazer login.',
       data: {},
+    };
+  }
+
+  async verifyCode(verifyDto: VerifyCodeDto) {
+    const [user] = await db
+      .select()
+      .from(tabelaUsuario)
+      .where(eq(tabelaUsuario.email, verifyDto.email))
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (user.verificationCode !== verifyDto.code) {
+      throw new BadRequestException('Código inválido.');
+    }
+
+    if (!user.codeExpiresAt) {
+      throw new BadRequestException(
+        'Este código é inválido ou já foi utilizado.',
+      );
+    }
+
+    if (new Date() > user.codeExpiresAt) {
+      throw new BadRequestException(
+        'Este código já expirou. Solicite um novo.',
+      );
+    }
+
+    await db
+      .update(tabelaUsuario)
+      .set({ isActive: true, verificationCode: null, codeExpiresAt: null })
+      .where(eq(tabelaUsuario.id, user.id))
+      .returning({
+        id: tabelaUsuario.id,
+        name: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+      });
+
+    const payload = { sub: user.id, email: user.email };
+    const access_token = await this.jwtService.signAsync(payload);
+
+    return {
+      message: 'Conta verificada com sucesso.',
+      data: {
+        user: {
+          id: user.id,
+          name: user.nome,
+          email: user.email,
+        },
+        access_token,
+      },
     };
   }
 }

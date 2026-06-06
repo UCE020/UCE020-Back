@@ -1,6 +1,6 @@
 
 import { relations } from "drizzle-orm";
-import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean } from "drizzle-orm/pg-core";
 
 //Criação das Tabelas no Banco de Dados utilizando Drizzle ORM
 
@@ -19,8 +19,11 @@ export const tabelaUsuario = pgTable("usuario", {
   nome: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
   senha: text("senha").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
   resetPasswordToken: text('reset_password_token'),
   resetPasswordExpires: timestamp('reset_password_expires'),
+  verificationCode: text('verification_code'),
+  codeExpiresAt: timestamp('code_expires_at'),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
