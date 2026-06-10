@@ -1,42 +1,33 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBadRequestResponse, ApiConflictResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import type { JwtPayload } from 'src/common/types/jwt-payload.type';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from 'src/common/decorators/usuario.decorator';
 
+@ApiTags('user')
+@ApiBearerAuth()
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+  @Get('me') 
+  @ApiOkResponse({ description: 'Perfil do usuário autenticado' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  getUserProfile(@User() usuario: JwtPayload) {
+    return this.userService.getUserProfile(usuario.sub);
   }
 
-  @Get()
-  findAll() {
-    return this.userService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Patch('me')
+  @ApiOkResponse({ description: 'Perfil atualizado com sucesso' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiBadRequestResponse({ description: 'Body vazio ou campo inválido' })
+  @ApiConflictResponse({ description: 'E-mail já está em uso' })
+  updateUserProfile(
+    @User() usuario: JwtPayload,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.userService.updateUserProfile(usuario.sub, dto);
   }
 }
