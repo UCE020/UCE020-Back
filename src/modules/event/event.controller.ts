@@ -22,7 +22,7 @@ export class EventController {
   @ApiResponse({ status: 201, description: 'Evento criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   async create(@Body() createEventDto: CreateEventDto) {
-    return await this.eventService.create(createEventDto);
+    return this.eventService.create(createEventDto);
   }
 
   @Get()
@@ -45,15 +45,18 @@ export class EventController {
   @ApiResponse({ status: 200, description: 'Evento encontrado' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
   async findOne(@Param('id') id: string) {
-    return await this.eventService.findOne(+id);
+    return this.eventService.findOne(+id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento atualizado com sucesso' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
-  async update(@Param('id') id: string, @Body() updateEventDto: UpdateEventDto) {
-    return await this.eventService.update(+id, updateEventDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateEventDto: UpdateEventDto,
+  ) {
+    return this.eventService.update(+id, updateEventDto);
   }
 
   @Delete(':id')
@@ -61,6 +64,6 @@ export class EventController {
   @ApiResponse({ status: 200, description: 'Evento removido com sucesso' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
   async remove(@Param('id') id: string) {
-    return await this.eventService.remove(+id);
+    return this.eventService.remove(+id);
   }
 }

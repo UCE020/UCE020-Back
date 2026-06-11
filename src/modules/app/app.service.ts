@@ -20,7 +20,7 @@ export class AppService {
         data: result.rows[0],
       };
     } catch (error) {
-      if (error instanceof Error){
+      if (error instanceof Error) {
         return {
           status: 'error',
           message: error.message,

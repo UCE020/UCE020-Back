@@ -11,7 +11,7 @@ export class CreateActivityDto {
   description?: string;
 
   @IsEnum(categoriaAtividadeEnum.enumValues)
-  type!: typeof categoriaAtividadeEnum.enumValues[number];
+  type!: (typeof categoriaAtividadeEnum.enumValues)[number];
 
   @Type(() => Number)
   @IsNumber()

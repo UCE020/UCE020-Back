@@ -8,13 +8,13 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-    // Prefixo global — todas as rotas ficam em /api/v1/...
+  // Prefixo global — todas as rotas ficam em /api/v1/...
   app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, 
-      forbidNonWhitelisted: true, 
+      whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
       stopAtFirstError: true,
     }),

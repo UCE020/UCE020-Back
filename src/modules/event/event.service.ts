@@ -31,7 +31,9 @@ export class EventService {
       .limit(1);
 
     if (!evento) {
-      throw new NotFoundException(`Evento com código "${codigo}" não encontrado.`);
+      throw new NotFoundException(
+        `Evento com código "${codigo}" não encontrado.`,
+      );
     }
 
     return {
