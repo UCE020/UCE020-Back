@@ -1,33 +1,58 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBadRequestResponse, ApiConflictResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  Body, Controller, Delete, Get, HttpCode,
+  HttpStatus, Param, ParseIntPipe, Patch, UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth, ApiBadRequestResponse, ApiConflictResponse,
+  ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse,
+  ApiTags, ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import { UserService } from './user.service';
-import type { JwtPayload } from 'src/common/types/jwt-payload.type';
+import { UserResponseDto } from './dto/user-response.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from 'src/common/decorators/usuario.decorator';
 
 @ApiTags('user')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('me') 
-  @ApiOkResponse({ description: 'Perfil do usuário autenticado' })
+  @Get()
+  @ApiOkResponse({ description: 'Lista de todos os usuários', type: [UserResponseDto] })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
-  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
-  getUserProfile(@User() usuario: JwtPayload) {
-    return this.userService.getUserProfile(usuario.sub);
+  listAllUsers() {
+    return this.userService.listAllUsers();
   }
 
-  @Patch('me')
-  @ApiOkResponse({ description: 'Perfil atualizado com sucesso' })
+  @Get(':id')
+  @ApiOkResponse({ description: 'Usuário encontrado', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
-  @ApiBadRequestResponse({ description: 'Body vazio ou campo inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  getUser(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.getUser(id);
+  }
+
+  @Patch(':id')
+  @ApiOkResponse({ description: 'Usuário atualizado com sucesso', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'Dados inválidos' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
   @ApiConflictResponse({ description: 'E-mail já está em uso' })
-  updateUserProfile(
-    @User() usuario: JwtPayload,
+  updateUser(
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
   ) {
-    return this.userService.updateUserProfile(usuario.sub, dto);
+    return this.userService.updateUser(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Usuário deletado com sucesso' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  deleteUser(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.deleteUser(id);
   }
 }

@@ -43,4 +43,17 @@ export class UserRepository {
       .returning(camposSeguros);
     return rows[0] ?? null;
   }
+
+  async findAll() {
+    return db
+      .select(camposSeguros)
+      .from(tabelaUsuario)
+      .orderBy(tabelaUsuario.createdAt);
+  }
+
+  async delete(id: number) {
+    await db
+      .delete(tabelaUsuario)
+      .where(eq(tabelaUsuario.id, id));
+  }
 }
