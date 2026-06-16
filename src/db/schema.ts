@@ -82,10 +82,6 @@ export const tabelaConvidado = pgTable('convidado', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   nome: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
-  funcao: funcaoConvidadoEnum('funcao').notNull(),
-  atividadeId: integer('atividade_id')
-    .notNull()
-    .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
 });
 
 //Tabela de atividade
@@ -94,7 +90,6 @@ export const tabelaAtividade = pgTable('atividade', {
   nome: varchar({ length: 255 }).notNull(),
   descricao: text('descricao').notNull(),
   localizacao: text('localizacao').notNull(),
-  responsavel: text('responsavel').notNull(),
   dataInicio: timestamp('dataInicio').notNull(),
   dataFim: timestamp('dataFim').notNull(),
   categoria: categoriaAtividadeEnum('categoria').notNull(),
@@ -196,7 +191,7 @@ export const tabelaAtividadeRelations = relations(
       references: [tabelaEvento.id],
     }),
     //Uma atividade tem muitos convidados
-    convidados: many(tabelaConvidado),
+    convidados: many(tabelaConvidadoAtividade),
     //Uma atividade tem muitos participantes
     participacoes: many(tabelaParticipacoesAtividades),
   }),
@@ -236,13 +231,35 @@ export const tabelaParticipacaoAtividadeRelations = relations(
   }),
 );
 
+export const tabelaConvidadoAtividade = pgTable('convidado_atividade', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  funcao: funcaoConvidadoEnum('funcao').notNull(),
+  convidadoId: integer('convidado_id')
+    .notNull()
+    .references(() => tabelaConvidado.id, { onDelete: 'cascade' }),
+  atividadeId: integer('atividade_id')
+    .notNull()
+    .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
+});
+
 //Relacionamento de convidado
 export const tabelaConvidadoRelations = relations(
   tabelaConvidado,
+  ({ many }) => ({
+    atividades: many(tabelaConvidadoAtividade),
+  }),
+);
+
+// Pivot — um vínculo pertence a um convidado e a uma atividade
+export const tabelaConvidadoAtividadeRelations = relations(
+  tabelaConvidadoAtividade,
   ({ one }) => ({
-    //Um convidado pertence a uma atividade
+    convidado: one(tabelaConvidado, {
+      fields: [tabelaConvidadoAtividade.convidadoId],
+      references: [tabelaConvidado.id],
+    }),
     atividade: one(tabelaAtividade, {
-      fields: [tabelaConvidado.atividadeId],
+      fields: [tabelaConvidadoAtividade.atividadeId],
       references: [tabelaAtividade.id],
     }),
   }),
