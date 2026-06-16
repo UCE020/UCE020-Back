@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { tabelaEvento } from '../../db/schema';
+import { tabelaEvento, tabelaParticipacoes } from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
@@ -31,12 +31,33 @@ export class EventService {
       .limit(1);
 
     if (!evento) {
-      throw new NotFoundException(`Evento com código "${codigo}" não encontrado.`);
+      throw new NotFoundException(
+        `Evento com código "${codigo}" não encontrado.`,
+      );
     }
 
     return {
       message: 'Evento encontrado.',
       data: evento,
+    };
+  }
+
+  async findEventsByUser(
+    userId: number,
+  ): Promise<{ message: string; data: Array<Record<string, unknown>> }> {
+    const eventos = await db
+      .select({ evento: tabelaEvento })
+      .from(tabelaEvento)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(tabelaParticipacoes.eventoId, tabelaEvento.id),
+      )
+      .where(eq(tabelaParticipacoes.usuarioId, userId))
+      .orderBy(tabelaEvento.dataInicio);
+
+    return {
+      message: 'Eventos do usuário listados com sucesso.',
+      data: eventos.map((row) => row.evento),
     };
   }
 

@@ -6,11 +6,23 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+
+interface RequestWithUser extends Request {
+  user: {
+    id: string | number;
+    name: string;
+    email: string;
+  };
+}
 
 @ApiTags('event')
 @Controller('event')
@@ -38,6 +50,24 @@ export class EventController {
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
   async findByCodigo(@Param('codigo') codigo: string) {
     return await this.eventService.findByCodigo(codigo);
+  }
+
+  @Get('participating')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Listar eventos nos quais o usuário autenticado está inscrito',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Eventos do usuário listados com sucesso',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  async findParticipatingEvents(@Req() req: RequestWithUser) {
+    const userId = Number(req.user.id);
+    return await this.eventService.findEventsByUser(userId);
   }
 
   @Get(':id')
