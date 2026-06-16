@@ -1,20 +1,85 @@
 import { Type } from 'class-transformer';
-import { IsString, IsNumber, Min, IsOptional, IsEnum } from 'class-validator';
-import { categoriaAtividadeEnum } from 'src/db/schema';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsDateString,
+  MinLength,
+  Min,
+  ValidateNested,
+  IsEmail,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { categoriaAtividadeEnum, funcaoConvidadoEnum } from 'src/db/schema';
+
+export class CreateGuestDto {
+  @ApiProperty({ example: 'João Silva' })
+  @IsString({ message: 'O nome deve ser uma string.' })
+  @MinLength(3, { message: 'O nome deve ter no mínimo 3 caracteres.' })
+  name!: string;
+
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail({}, { message: 'Informe um e-mail válido.' })
+  email!: string;
+
+  @ApiProperty({ enum: funcaoConvidadoEnum.enumValues, example: 'palestrante' })
+  @IsEnum(funcaoConvidadoEnum.enumValues, { message: 'Função inválida.' })
+  role!: (typeof funcaoConvidadoEnum.enumValues)[number];
+}
 
 export class CreateActivityDto {
-  @IsString()
-  title!: string;
+  @ApiProperty({ example: 'Introdução ao React' })
+  @IsString({ message: 'O nome deve ser uma string.' })
+  @MinLength(3, { message: 'O nome deve ter no mínimo 3 caracteres.' })
+  name!: string;
 
-  @IsString()
-  @IsOptional()
-  description?: string;
+  @ApiProperty({
+    example: 'Atividade prática com foco em componentes e hooks.',
+  })
+  @IsString({ message: 'A descrição deve ser uma string.' })
+  description!: string;
 
-  @IsEnum(categoriaAtividadeEnum.enumValues)
-  type!: typeof categoriaAtividadeEnum.enumValues[number];
+  @ApiProperty({ example: 'Sala 01' })
+  @IsString({ message: 'A localização deve ser uma string.' })
+  location!: string;
 
+  @ApiProperty({ enum: categoriaAtividadeEnum.enumValues, example: 'oficina' })
+  @IsEnum(categoriaAtividadeEnum.enumValues, { message: 'Categoria inválida.' })
+  category!: (typeof categoriaAtividadeEnum.enumValues)[number];
+
+  @ApiPropertyOptional({ example: 4 })
   @Type(() => Number)
-  @IsNumber()
-  @Min(1)
+  @IsNumber({}, { message: 'A carga horária deve ser um número.' })
+  @Min(0, { message: 'A carga horária não pode ser negativa.' })
+  @IsOptional()
+  workload?: number;
+
+  @ApiProperty({ example: '2026-05-20T08:00:00' })
+  @IsDateString(
+    {},
+    { message: 'Informe uma data e horário de início válidos.' },
+  )
+  startDate!: string;
+
+  @ApiProperty({ example: '2026-05-20T12:00:00' })
+  @IsDateString(
+    {},
+    { message: 'Informe uma data e horário de término válidos.' },
+  )
+  endDate!: string;
+
+  @ApiProperty({ example: 1 })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'O ID do evento deve ser um número.' })
+  @Min(1, { message: 'O ID do evento é inválido.' })
   eventId!: number;
+
+  @ApiPropertyOptional({ type: [CreateGuestDto] })
+  @IsArray({ message: 'Os convidados devem ser uma lista.' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateGuestDto)
+  guests?: CreateGuestDto[];
 }
