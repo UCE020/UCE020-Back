@@ -16,15 +16,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
-
-interface RequestWithUser extends Request {
-  user: {
-    id: string;
-    nome: string;
-    email: string;
-    isActive: boolean;
-  };
-}
+import type { RequestWithUser } from 'src/common/types/request-with-user.type';
 
 @ApiTags('auth')
 @Controller('auth')
