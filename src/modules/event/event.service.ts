@@ -7,8 +7,27 @@ import { UpdateEventDto } from './dto/update-event.dto';
 
 @Injectable()
 export class EventService {
-  create(createEventDto: CreateEventDto) {
-    return { success: true, data: createEventDto };
+  async create(createEventDto: CreateEventDto) {
+    const [novoEvento] = await db
+      .insert(tabelaEvento)
+      .values({
+        nome: createEventDto.nome,
+        codigo: createEventDto.codigo,
+        descricao: createEventDto.descricao,
+        localizacao: createEventDto.localizacao,
+        responsavel: createEventDto.responsavel,
+        cargaHoraria: createEventDto.cargaHoraria,
+        dataInicio: createEventDto.dataInicio,
+        dataFim: createEventDto.dataFim,
+        status: createEventDto.status,
+        foto: createEventDto.foto,
+      })
+      .returning();
+
+    return {
+      message: 'Evento criado com sucesso.',
+      data: novoEvento,
+    };
   }
 
   async findAll() {
@@ -61,15 +80,62 @@ export class EventService {
     };
   }
 
-  findOne(id: number) {
-    return { success: true, data: { id } };
+  async findOne(id: number) {
+    const [evento] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!evento) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    return {
+      message: 'Evento encontrado.',
+      data: evento,
+    };
   }
 
-  update(id: number, updateEventDto: UpdateEventDto) {
-    return { success: true, data: { id, ...updateEventDto } };
+  async update(id: number, updateEventDto: UpdateEventDto) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    const [eventoAtualizado] = await db
+      .update(tabelaEvento)
+      .set(updateEventDto)
+      .where(eq(tabelaEvento.id, id))
+      .returning();
+
+    return {
+      message: 'Evento atualizado com sucesso.',
+      data: eventoAtualizado,
+    };
   }
 
-  remove(id: number) {
-    return { success: true, data: { id } };
+  async remove(id: number) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    await db.delete(tabelaEvento).where(eq(tabelaEvento.id, id));
+
+    return {
+      message: 'Evento removido com sucesso.',
+      data: eventoExistente,
+    };
   }
 }
