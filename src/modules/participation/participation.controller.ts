@@ -1,45 +1,41 @@
+import { Controller, Post, Delete, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+  ApiBearerAuth, ApiConflictResponse, ApiNotFoundResponse,
+  ApiOkResponse, ApiTags, ApiUnauthorizedResponse, ApiBadRequestResponse,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { User } from 'src/common/decorators/usuario.decorator';
+import type { JwtPayload } from 'src/common/types/jwt-payload.type';
 import { ParticipationService } from './participation.service';
-import { CreateParticipationDto } from './dto/create-participation.dto';
-import { UpdateParticipationDto } from './dto/update-participation.dto';
 
-@Controller('participation')
+@ApiTags('participation')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('event/:eventoId/subscription')
 export class ParticipationController {
   constructor(private readonly participationService: ParticipationService) {}
 
   @Post()
-  create(@Body() createParticipationDto: CreateParticipationDto) {
-    return this.participationService.create(createParticipationDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.participationService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.participationService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateParticipationDto: UpdateParticipationDto,
+  @ApiOkResponse({ description: 'Inscrição realizada com sucesso' })
+  @ApiBadRequestResponse({ description: 'Evento já finalizado' })
+  @ApiConflictResponse({ description: 'Usuário já inscrito' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  subscribe(
+    @User() user: JwtPayload,
+    @Param('eventoId', ParseIntPipe) eventoId: number,
   ) {
-    return this.participationService.update(+id, updateParticipationDto);
+    return this.participationService.subscribe(Number(user.sub), eventoId);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.participationService.remove(+id);
+  @Delete()
+  @ApiOkResponse({ description: 'Inscrição cancelada com sucesso' })
+  @ApiNotFoundResponse({ description: 'Inscrição não encontrada' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  unsubscribe(
+    @User() user: JwtPayload,
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+  ) {
+    return this.participationService.unsubscribe(Number(user.sub), eventoId);
   }
 }
