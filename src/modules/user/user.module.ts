@@ -5,7 +5,7 @@ import { ProfileController } from './profile.controller';
 import { UserController } from './user.controller';
 
 @Module({
-  controllers: [UserController, ProfileController],
+  controllers: [ProfileController, UserController],
   providers: [UserService, UserRepository],
   exports: [UserService],
 })
