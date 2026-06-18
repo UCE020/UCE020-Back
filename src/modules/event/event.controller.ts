@@ -15,13 +15,10 @@ import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { User } from '../auth/types/user';
 
 interface RequestWithUser extends Request {
-  user: {
-    id: string | number;
-    name: string;
-    email: string;
-  };
+  user: User;
 }
 
 @ApiTags('event')
