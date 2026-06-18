@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { tabelaEvento, tabelaParticipacoes } from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -76,6 +76,28 @@ export class EventService {
 
     return {
       message: 'Eventos do usuário listados com sucesso.',
+      data: eventos.map((row) => row.evento),
+    };
+  }
+
+  async findEventsByOrganizer(userId: number) {
+    const eventos = await db
+      .select({ evento: tabelaEvento })
+      .from(tabelaEvento)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(tabelaParticipacoes.eventoId, tabelaEvento.id),
+      )
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.tipo, 'organizador'), // Filtra apenas organizadores
+        ),
+      )
+      .orderBy(tabelaEvento.dataInicio);
+
+    return {
+      message: 'Eventos organizados listados com sucesso.',
       data: eventos.map((row) => row.evento),
     };
   }

@@ -55,6 +55,17 @@ export class EventController {
     return await this.eventService.findByCodigo(codigo);
   }
 
+  @Get('organized')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar eventos organizados pelo usuário' })
+  @ApiResponse({ status: 200, description: 'Eventos organizados listados' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  async findOrganizerEvents(@Req() req: RequestWithUser) {
+    const userId = Number(req.user.id);
+    return await this.eventService.findEventsByOrganizer(userId);
+  }
+
   @Get('participating')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
