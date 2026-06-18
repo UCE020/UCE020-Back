@@ -25,7 +25,7 @@ export class ParticipationController {
     @User() user: JwtPayload,
     @Param('eventoId', ParseIntPipe) eventoId: number,
   ) {
-    return this.participationService.subscribe(Number(user.sub), eventoId);
+    return this.participationService.subscribe(user.sub, eventoId);
   }
 
   @Delete()
@@ -36,6 +36,6 @@ export class ParticipationController {
     @User() user: JwtPayload,
     @Param('eventoId', ParseIntPipe) eventoId: number,
   ) {
-    return this.participationService.unsubscribe(Number(user.sub), eventoId);
+    return this.participationService.unsubscribe(user.sub, eventoId);
   }
 }
