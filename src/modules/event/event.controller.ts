@@ -15,13 +15,10 @@ import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { JwtPayload } from 'src/common/types/jwt-payload.type';
 
 interface RequestWithUser extends Request {
-  user: {
-    id: string | number;
-    name: string;
-    email: string;
-  };
+  user: JwtPayload;
 }
 
 @ApiTags('event')
@@ -70,7 +67,7 @@ export class EventController {
     description: 'Token de autenticação inválido ou ausente',
   })
   async findParticipatingEvents(@Req() req: RequestWithUser) {
-    const userId = Number(req.user.id);
+    const userId = Number(req.user.sub);
     return await this.eventService.findEventsByUser(userId);
   }
 
