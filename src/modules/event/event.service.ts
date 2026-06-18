@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { tabelaEvento, tabelaParticipacoes } from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+
+export type TipoParticipante = 'participante' | 'organizador' | 'monitor';
 
 @Injectable()
 export class EventService {
@@ -63,7 +65,14 @@ export class EventService {
 
   async findEventsByUser(
     userId: number,
+    tipo?: TipoParticipante,
   ): Promise<{ message: string; data: Array<Record<string, unknown>> }> {
+    const filtros = [eq(tabelaParticipacoes.usuarioId, userId)];
+
+    if (tipo) {
+      filtros.push(eq(tabelaParticipacoes.tipo, tipo));
+    }
+
     const eventos = await db
       .select({ evento: tabelaEvento })
       .from(tabelaEvento)
@@ -71,7 +80,7 @@ export class EventService {
         tabelaParticipacoes,
         eq(tabelaParticipacoes.eventoId, tabelaEvento.id),
       )
-      .where(eq(tabelaParticipacoes.usuarioId, userId))
+      .where(and(...filtros))
       .orderBy(tabelaEvento.dataInicio);
 
     return {
