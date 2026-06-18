@@ -16,26 +16,60 @@ export class ParticipationController {
   constructor(private readonly participationService: ParticipationService) {}
 
   @Post()
-  @ApiOkResponse({ description: 'Inscrição realizada com sucesso' })
+  @ApiOkResponse({ 
+    description: 'Inscrição realizada com sucesso',
+    schema: {
+      example: {
+        message: 'Inscrição realizada com sucesso!',
+        eventoId: 10,
+        userId: 1
+      }
+    }
+  })
   @ApiBadRequestResponse({ description: 'Evento já finalizado' })
   @ApiConflictResponse({ description: 'Usuário já inscrito' })
   @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
-  subscribe(
+  async subscribe(
     @User() user: JwtPayload,
     @Param('eventoId', ParseIntPipe) eventoId: number,
   ) {
-    return this.participationService.subscribe(user.sub, eventoId);
+    // Aguarda o serviço processar a inscrição no banco
+    await this.participationService.subscribe(user.sub, eventoId);
+
+    // Retorna o payload estruturado para o front
+    return {
+      message: 'Inscrição realizada com sucesso!',
+      eventoId: eventoId,
+      userId: user.sub,
+    };
   }
 
   @Delete()
-  @ApiOkResponse({ description: 'Inscrição cancelada com sucesso' })
+  @ApiOkResponse({ 
+    description: 'Inscrição cancelada com sucesso',
+    schema: {
+      example: {
+        message: 'Inscrição cancelada com sucesso.',
+        eventoId: 10,
+        userId: 1
+      }
+    }
+  })
   @ApiNotFoundResponse({ description: 'Inscrição não encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
-  unsubscribe(
+  async unsubscribe(
     @User() user: JwtPayload,
     @Param('eventoId', ParseIntPipe) eventoId: number,
   ) {
-    return this.participationService.unsubscribe(user.sub, eventoId);
+    // Aguarda o serviço remover a inscrição no banco
+    await this.participationService.unsubscribe(user.sub, eventoId);
+
+    // Retorna o payload de confirmação
+    return {
+      message: 'Inscrição cancelada com sucesso.',
+      eventoId: eventoId,
+      userId: user.sub,
+    };
   }
 }
