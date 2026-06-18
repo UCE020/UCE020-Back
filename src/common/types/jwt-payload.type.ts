@@ -3,4 +3,5 @@ export interface JwtPayload {
   email: string;
   iat?:  number; // emitido em (gerado automaticamente pelo jwt)
   exp?:  number; // expira em (gerado automaticamente pelo jwt)
+  name?: string; // nome do usuário 
 }
