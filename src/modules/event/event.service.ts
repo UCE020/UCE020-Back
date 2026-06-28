@@ -9,12 +9,41 @@ export type TipoParticipante = 'participante' | 'organizador' | 'monitor';
 
 @Injectable()
 export class EventService {
-  async create(createEventDto: CreateEventDto) {
+  private async gerarCodigoUnico(nome: string): Promise<string> {
+    const prefixo = nome
+      .replace(/[^a-zA-Z]/g, '')
+      .toUpperCase()
+      .substring(0, 3)
+      .padEnd(3, 'X');
+
+    for (let tentativas = 0; tentativas < 10; tentativas++) {
+      const sufixo = Math.floor(1000 + Math.random() * 9000).toString();
+      const codigo = `${prefixo}${sufixo}`;
+
+      const [existente] = await db
+        .select({ id: tabelaEvento.id })
+        .from(tabelaEvento)
+        .where(eq(tabelaEvento.codigo, codigo))
+        .limit(1);
+
+      if (!existente) {
+        return codigo;
+      }
+    }
+
+    return `${prefixo}${Date.now().toString().slice(-4)}`;
+  }
+
+  async create(createEventDto: CreateEventDto, userId: number) {
+    const codigo =
+      createEventDto.codigo?.trim() ||
+      (await this.gerarCodigoUnico(createEventDto.nome));
+
     const [novoEvento] = await db
       .insert(tabelaEvento)
       .values({
         nome: createEventDto.nome,
-        codigo: createEventDto.codigo,
+        codigo,
         descricao: createEventDto.descricao,
         localizacao: createEventDto.localizacao,
         responsavel: createEventDto.responsavel,
@@ -25,6 +54,13 @@ export class EventService {
         foto: createEventDto.foto,
       })
       .returning();
+
+    // Registra o criador como organizador do evento
+    await db.insert(tabelaParticipacoes).values({
+      usuarioId: userId,
+      eventoId: novoEvento.id,
+      tipo: 'organizador',
+    });
 
     return {
       message: 'Evento criado com sucesso.',
