@@ -47,8 +47,9 @@ export class EventController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async create(@Body() createEventDto: CreateEventDto) {
-    return await this.eventService.create(createEventDto);
+  async create(@Body() createEventDto: CreateEventDto, @User() user: JwtPayload) {
+    const userId = Number(user.sub);
+    return await this.eventService.create(createEventDto, userId);
   }
 
   @Get()
