@@ -7,7 +7,7 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(2)
   @MaxLength(255)
-  nome?: string;
+  name?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

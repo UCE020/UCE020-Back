@@ -2,11 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { db } from "src/db";
 import { tabelaUsuario } from "src/db/schema";
 import { UpdateUserDto } from "../dto/update-user.dto";
-import { eq, ne, and } from "drizzle-orm";
+import { UpdateProfileDto } from "../dto/update-profile.dto";
+import { eq, ne, and, sql } from "drizzle-orm";
 
 const camposSeguros = {
   id:        tabelaUsuario.id,
-  nome:      tabelaUsuario.nome,
+  name:      sql<string>`${tabelaUsuario.nome}`.as('name'),
   email:     tabelaUsuario.email,
   createdAt: tabelaUsuario.createdAt,
   updatedAt: tabelaUsuario.updatedAt,
@@ -28,17 +29,26 @@ export class UserRepository {
       .select({ id: tabelaUsuario.id })
       .from(tabelaUsuario)
       .where(and(
-        eq(tabelaUsuario.email, email),
+        eq(tabelaUsuario.email, email.toLowerCase()),
         ne(tabelaUsuario.id, excludeId),
       ))
       .limit(1);
     return found.length > 0;
   }
 
-  async update(id: number, data: Partial<UpdateUserDto>) {
+  async update(id: number, data: Partial<UpdateUserDto> | Partial<UpdateProfileDto>) {
+    // mapeia "name" de volta para "nome" antes de salvar
+    const { name, ...rest } = data as { name?: string; email?: string };
+    
+    const payload: { nome?: string; email?: string; updatedAt: Date } = {
+      ...rest,
+      ...(name !== undefined && { nome: name }),
+      updatedAt: new Date(),
+    };
+
     const rows = await db
       .update(tabelaUsuario)
-      .set({ ...data, updatedAt: new Date() })
+      .set(payload)
       .where(eq(tabelaUsuario.id, id))
       .returning(camposSeguros);
     return rows[0] ?? null;
