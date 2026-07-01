@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 
 @Injectable()
 export class ParticipationRepository {
+  //Retorna a participação do usuário em um evento específico, se existir
   async findSubscription(usuarioId: number, eventoId: number) {
     const [participacao] = await db
       .select()

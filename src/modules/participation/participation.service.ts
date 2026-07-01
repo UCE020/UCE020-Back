@@ -45,4 +45,16 @@ export class ParticipationService {
       message: 'Inscrição cancelada com sucesso',
     };
   }
+
+  async findSubscription(usuarioId: number, eventoId: number) {
+    const participacao = await this.repo.findSubscription(usuarioId, eventoId);
+    if (!participacao) {
+      throw new NotFoundException('Inscrição não encontrada');
+    } else {
+      return {
+        message: 'Inscrição encontrada com sucesso',
+        data: participacao.tipo,
+      };
+    }
+  }
 }
