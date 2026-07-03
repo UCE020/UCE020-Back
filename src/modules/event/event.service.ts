@@ -340,6 +340,33 @@ export class EventService {
     };
   }
 
+  async finalizar(id: number) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    if (eventoExistente.status === 'finalizada') {
+      throw new BadRequestException('Evento já está finalizado.');
+    }
+
+    const [eventoAtualizado] = await db
+      .update(tabelaEvento)
+      .set({ status: 'finalizada' })
+      .where(eq(tabelaEvento.id, id))
+      .returning();
+
+    return {
+      message: 'Evento finalizado com sucesso.',
+      data: eventoAtualizado,
+    };
+  }
+
   async remove(id: number) {
     const [eventoExistente] = await db
       .select()

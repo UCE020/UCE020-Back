@@ -137,6 +137,21 @@ export class EventController {
     return await this.eventService.update(+id, updateEventDto, userId);
   }
 
+  @Patch(':id/finalizar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Finalizar evento pelo ID' })
+  @ApiResponse({ status: 200, description: 'Evento finalizado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Evento já está finalizado' })
+  @ApiResponse({ status: 404, description: 'Evento não encontrado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  async finalizar(@Param('id') id: string) {
+    return await this.eventService.finalizar(+id);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
