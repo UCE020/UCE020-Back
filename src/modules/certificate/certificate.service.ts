@@ -1,26 +1,38 @@
-import { Injectable } from '@nestjs/common';
-import { CreateCertificateDto } from './dto/create-certificate.dto';
-import { UpdateCertificateDto } from './dto/update-certificate.dto';
+// src/modules/certificate/certificate.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CertificateRepository } from './repository/certificate.respository';
 
 @Injectable()
 export class CertificateService {
-  create(createCertificateDto: CreateCertificateDto) {
-    return { success: true, data: createCertificateDto };
+  constructor(private readonly repo: CertificateRepository) {}
+
+// certificate.service.ts
+async getCertificatesByEvent(eventoId: number, page: number, limit: number) {
+  const rows = await this.repo.findByEvent(eventoId, page, limit);
+
+  if (!rows.length) {
+    throw new NotFoundException('Nenhum certificado encontrado para este evento');
   }
 
-  findAll() {
-    return { success: true, data: [] };
-  }
+  return rows.map(row => ({
+    id:               String(row.id),
+    title:            row.activityTitle,
+    participantName:  row.participantName,
+    participantEmail: row.participantEmail,
+    role:             this.mapRole(row.role),
+    hours:            row.activityHours ?? undefined,
+    issueDate:        row.dataEmissao.toISOString(),
+    imageUrl:         undefined,
+  }));
+}
 
-  findOne(id: number) {
-    return { success: true, data: { id } };
-  }
-
-  update(id: number, updateCertificateDto: UpdateCertificateDto) {
-    return { success: true, data: { id, ...updateCertificateDto } };
-  }
-
-  remove(id: number) {
-    return { success: true, data: { id } };
+  private mapRole(role: string): string {
+    const map: Record<string, string> = {
+      participante: 'Ouvinte',
+      monitor:      'Monitor',
+      organizador:  'Organizador',
+      palestrante:  'Palestrante',
+    };
+    return map[role.toLowerCase()] ?? role;
   }
 }
