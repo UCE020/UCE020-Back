@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { db } from '../../db';
@@ -240,6 +241,12 @@ export class EventService {
 
     if (!eventoExistente) {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    if (eventoExistente.status === 'finalizada') {
+      throw new BadRequestException(
+        'Não é possível editar um evento já finalizado.',
+      );
     }
 
     await assertEventOrganizer(userId, eventoExistente.id);

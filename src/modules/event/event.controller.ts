@@ -123,6 +123,7 @@ export class EventController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Atualizar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento atualizado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Evento já está finalizado' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
   @ApiResponse({
     status: 401,
