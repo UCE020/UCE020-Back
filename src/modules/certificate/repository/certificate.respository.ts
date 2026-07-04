@@ -7,7 +7,7 @@ import {
   tabelaUsuario,
   tabelaAtividade,
 } from 'src/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 @Injectable()
 export class CertificateRepository {
@@ -32,5 +32,14 @@ export class CertificateRepository {
       .where(eq(tabelaAtividade.eventoId, eventoId))
       .limit(limit)
       .offset(offset);
+  }
+
+    async countByEvent(eventoId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tabelaCertificadoEvento)
+      .innerJoin(tabelaAtividade, eq(tabelaCertificadoEvento.eventoId, tabelaAtividade.id))
+      .where(eq(tabelaAtividade.eventoId, eventoId));
+    return result[0]?.count ?? 0;
   }
 }
