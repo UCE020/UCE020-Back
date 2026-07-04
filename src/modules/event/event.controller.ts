@@ -6,23 +6,31 @@ import {
   Patch,
   Param,
   Delete,
-  Req,
   UseGuards,
+  UnauthorizedException,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
-import { Request } from 'express';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { EventService } from './event.service';
+import type { TipoParticipante } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import type { JwtPayload } from 'src/common/types/jwt-payload.type';
+import { User } from 'src/common/decorators/usuario.decorator';
 
-interface RequestWithUser extends Request {
-  user: {
-    id: string | number;
-    name: string;
-    email: string;
-  };
-}
+const TIPOS_PARTICIPANTE: TipoParticipante[] = [
+  'participante',
+  'organizador',
+  'monitor',
+];
 
 @ApiTags('event')
 @Controller('event')
@@ -30,11 +38,21 @@ export class EventController {
   constructor(private readonly eventService: EventService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Criar novo evento' })
   @ApiResponse({ status: 201, description: 'Evento criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  create(@Body() createEventDto: CreateEventDto) {
-    return this.eventService.create(createEventDto);
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  async create(
+    @Body() createEventDto: CreateEventDto,
+    @User() user: JwtPayload,
+  ) {
+    const userId = Number(user.sub);
+    return await this.eventService.create(createEventDto, userId);
   }
 
   @Get()
@@ -54,8 +72,9 @@ export class EventController {
 
   @Get('participating')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Listar eventos nos quais o usuário autenticado está inscrito',
+    summary: 'Listar eventos nos quais o usuário autenticado',
   })
   @ApiResponse({
     status: 200,
@@ -65,32 +84,67 @@ export class EventController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async findParticipatingEvents(@Req() req: RequestWithUser) {
-    const userId = Number(req.user.id);
-    return await this.eventService.findEventsByUser(userId);
+  @ApiQuery({
+    name: 'tipo',
+    required: false,
+    enum: TIPOS_PARTICIPANTE,
+    description: 'Filtra os eventos pelo tipo de participação do usuário',
+  })
+  async findParticipatingEvents(
+    @User() user: JwtPayload,
+    @Query('tipo') tipo?: TipoParticipante,
+  ) {
+    const userId = Number(user.sub);
+
+    if (!Number.isInteger(userId)) {
+      throw new UnauthorizedException('Token de autenticação inválido.');
+    }
+
+    if (tipo && !TIPOS_PARTICIPANTE.includes(tipo)) {
+      throw new BadRequestException(
+        'Tipo de participação inválido. Use participante, organizador ou monitor.',
+      );
+    }
+
+    return await this.eventService.findEventsByUser(userId, tipo);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento encontrado' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
-  findOne(@Param('id') id: string) {
-    return this.eventService.findOne(+id);
+  async findOne(@Param('id') id: string) {
+    return await this.eventService.findOne(+id);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Atualizar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento atualizado com sucesso' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
-  update(@Param('id') id: string, @Body() updateEventDto: UpdateEventDto) {
-    return this.eventService.update(+id, updateEventDto);
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  async update(
+    @Param('id') id: string,
+    @Body() updateEventDto: UpdateEventDto,
+  ) {
+    return await this.eventService.update(+id, updateEventDto);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Remover evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento removido com sucesso' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
-  remove(@Param('id') id: string) {
-    return this.eventService.remove(+id);
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  async remove(@Param('id') id: string) {
+    return await this.eventService.remove(+id);
   }
 }
