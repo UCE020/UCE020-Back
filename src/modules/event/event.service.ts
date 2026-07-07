@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { tabelaEvento, tabelaParticipacoes } from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -126,19 +126,23 @@ export class EventService {
   }
 
   async findOne(id: number) {
-    const [evento] = await db
-      .select()
+    const [resultado] = await db
+      .select({
+        ...getTableColumns(tabelaEvento),
+        totalInscritos: sql<number>`count(${tabelaParticipacoes.id})::int`,
+      })
       .from(tabelaEvento)
+      .leftJoin(tabelaParticipacoes, eq(tabelaParticipacoes.eventoId, tabelaEvento.id))
       .where(eq(tabelaEvento.id, id))
-      .limit(1);
+      .groupBy(tabelaEvento.id);
 
-    if (!evento) {
+    if (!resultado) {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
     }
 
     return {
       message: 'Evento encontrado.',
-      data: evento,
+      data: resultado, 
     };
   }
 
