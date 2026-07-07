@@ -131,8 +131,10 @@ export class EventController {
   async update(
     @Param('id') id: string,
     @Body() updateEventDto: UpdateEventDto,
+    @User() user: JwtPayload,
   ) {
-    return await this.eventService.update(+id, updateEventDto);
+    const userId = Number(user.sub);
+    return await this.eventService.update(+id, updateEventDto, userId);
   }
 
   @Delete(':id')
