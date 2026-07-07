@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -347,7 +349,7 @@ export class EventService {
     };
   }
 
-  async finalizar(id: number) {
+  async finalizar(id: number, userId: number) {
     const [eventoExistente] = await db
       .select()
       .from(tabelaEvento)
@@ -356,6 +358,23 @@ export class EventService {
 
     if (!eventoExistente) {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    const [participacao] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, id),
+        ),
+      )
+      .limit(1);
+
+    if (!participacao || participacao.tipo !== 'organizador') {
+      throw new ForbiddenException(
+        'Apenas o organizador do evento pode finalizá-lo.',
+      );
     }
 
     if (eventoExistente.status === 'finalizada') {

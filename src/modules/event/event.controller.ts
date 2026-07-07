@@ -149,8 +149,12 @@ export class EventController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async finalizar(@Param('id') id: string) {
-    return await this.eventService.finalizar(+id);
+  @ApiResponse({
+    status: 403,
+    description: 'Usuário não é organizador do evento',
+  })
+  async finalizar(@Param('id') id: string, @User() user: JwtPayload) {
+    return await this.eventService.finalizar(+id, Number(user.sub));
   }
 
   @Delete(':id')
