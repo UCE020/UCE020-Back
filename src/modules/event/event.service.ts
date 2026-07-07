@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   tabelaEvento,
   tabelaParticipacoes,
   tabelaAtividade,
+  tabelaUsuario,
 } from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -343,6 +348,133 @@ export class EventService {
     return {
       message: 'Evento removido com sucesso.',
       data: eventoExistente,
+    };
+  }
+
+  // Métodos auxiliares para membros
+
+  async checkIsOrganizer(eventId: number, userId: number): Promise<void> {
+    const [participacao] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.tipo, 'organizador'),
+        ),
+      )
+      .limit(1);
+
+    if (!participacao) {
+      throw new ForbiddenException(
+        'Apenas organizadores podem gerenciar membros.',
+      );
+    }
+  }
+
+  // Membros do Evento
+
+  async getEventMembers(eventId: number) {
+    await this.findOne(eventId); // Garante que o evento existe
+
+    const membros = await db
+      .select({
+        id: tabelaParticipacoes.id,
+        usuarioId: tabelaParticipacoes.usuarioId,
+        tipo: tabelaParticipacoes.tipo,
+        nome: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+      })
+      .from(tabelaParticipacoes)
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
+      )
+      .where(eq(tabelaParticipacoes.eventoId, eventId));
+
+    return {
+      message: 'Membros do evento listados com sucesso.',
+      data: membros,
+    };
+  }
+
+  async updateEventMember(
+    eventId: number,
+    memberUserId: number,
+    tipo: TipoParticipante,
+    requesterId: number,
+  ) {
+    await this.checkIsOrganizer(eventId, requesterId);
+
+    const [participacaoExistente] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .limit(1);
+
+    if (!participacaoExistente) {
+      throw new NotFoundException(`Membro não encontrado neste evento.`);
+    }
+
+    const [participacaoAtualizada] = await db
+      .update(tabelaParticipacoes)
+      .set({ tipo })
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .returning();
+
+    return {
+      message: 'Papel do membro atualizado com sucesso.',
+      data: participacaoAtualizada,
+    };
+  }
+
+  async removeEventMember(
+    eventId: number,
+    memberUserId: number,
+    requesterId: number,
+  ) {
+    await this.checkIsOrganizer(eventId, requesterId);
+
+    // Não permitir que o organizador se remova caso seja o único organizador (opcional, mas recomendado evitar se remover sem querer)
+    // Para simplificar a task, apenas processamos a remoção básica:
+    const [participacaoExistente] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .limit(1);
+
+    if (!participacaoExistente) {
+      throw new NotFoundException(`Membro não encontrado neste evento.`);
+    }
+
+    await db
+      .delete(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      );
+
+    return {
+      message: 'Membro removido do evento com sucesso.',
+      data: participacaoExistente,
     };
   }
 }

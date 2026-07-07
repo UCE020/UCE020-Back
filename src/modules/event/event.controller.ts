@@ -22,6 +22,7 @@ import { EventService } from './event.service';
 import type { TipoParticipante } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { UpdateMemberDto } from './dto/update-member.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import type { JwtPayload } from 'src/common/types/jwt-payload.type';
 import { User } from 'src/common/decorators/usuario.decorator';
@@ -148,5 +149,54 @@ export class EventController {
   })
   async remove(@Param('id') id: string) {
     return await this.eventService.remove(+id);
+  }
+
+  // --- Rotas de Gerenciamento de Membros ---
+
+  @Get(':id/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar todos os membros do evento' })
+  @ApiResponse({ status: 200, description: 'Membros listados com sucesso' })
+  async getMembers(@Param('id') id: string) {
+    return await this.eventService.getEventMembers(+id);
+  }
+
+  @Patch(':id/members/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Atualizar papel/tipo de um membro (apenas organizadores)',
+  })
+  @ApiResponse({ status: 200, description: 'Membro atualizado com sucesso' })
+  async updateMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() updateMemberDto: UpdateMemberDto,
+    @User() user: JwtPayload,
+  ) {
+    const requesterId = Number(user.sub);
+    return await this.eventService.updateEventMember(
+      +id,
+      +userId,
+      updateMemberDto.tipo,
+      requesterId,
+    );
+  }
+
+  @Delete(':id/members/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Remover um membro do evento (apenas organizadores)',
+  })
+  @ApiResponse({ status: 200, description: 'Membro removido com sucesso' })
+  async removeMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @User() user: JwtPayload,
+  ) {
+    const requesterId = Number(user.sub);
+    return await this.eventService.removeEventMember(+id, +userId, requesterId);
   }
 }
