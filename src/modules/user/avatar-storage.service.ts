@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { writeFile, unlink, access } from 'fs/promises';
 import { extname, join } from 'path';
 import 'multer';
 
@@ -10,7 +11,7 @@ const UPLOAD_DIR = join(process.cwd(), 'uploads', 'avatars');
 
 // Base pública usada para montar a URL retornada ao front-end.
 // Em produção, isso normalmente é o domínio da API ou de um CDN.
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:3000';
 
 const EXTENSOES_PERMITIDAS = ['.png', '.jpg', '.jpeg', '.webp'];
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024; // 5MB
@@ -45,7 +46,7 @@ export class AvatarStorageService {
     const nomeArquivo = `${userId}-${randomUUID()}${extensao}`;
     const caminhoCompleto = join(UPLOAD_DIR, nomeArquivo);
 
-    writeFileSync(caminhoCompleto, file.buffer);
+    await writeFile(caminhoCompleto, file.buffer);
 
     return `${PUBLIC_BASE_URL}/uploads/avatars/${nomeArquivo}`;
   }
@@ -61,8 +62,12 @@ export class AvatarStorageService {
     if (!nomeArquivo) return;
 
     const caminhoCompleto = join(UPLOAD_DIR, nomeArquivo);
-    if (existsSync(caminhoCompleto)) {
-      unlinkSync(caminhoCompleto);
+
+    try {
+      await access(caminhoCompleto);
+      await unlink(caminhoCompleto);
+    } catch {
+      // Arquivo já não existe — nada a fazer.
     }
   }
 }
