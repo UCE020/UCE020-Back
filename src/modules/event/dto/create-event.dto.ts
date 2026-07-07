@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsEnum,
 } from 'class-validator';
+import { CreateActivityDto } from 'src/modules/activity/dto/create-activity.dto';
 
 export class CreateEventDto {
   @IsString()
@@ -44,4 +45,8 @@ export class CreateEventDto {
   @IsString()
   @IsOptional()
   foto?: string;
+
+  @Type(() => Array)
+  @IsOptional()
+  atividades?: CreateActivityDto[];
 }
