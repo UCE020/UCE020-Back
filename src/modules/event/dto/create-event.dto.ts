@@ -1,29 +1,52 @@
 import { Type } from 'class-transformer';
-import { IsString, IsDate, Min, IsInt, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsDate,
+  Min,
+  IsInt,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
+import { CreateActivityDto } from 'src/modules/activity/dto/create-activity.dto';
 
 export class CreateEventDto {
   @IsString()
-  title!: string;
+  nome!: string;
 
   @IsString()
   @IsOptional()
-  description?: string;
-
-  @Type(() => Date)
-  @IsDate()
-  startDate!: Date;
-
-  @Type(() => Date)
-  @IsDate()
-  endDate!: Date;
+  codigo?: string;
 
   @IsString()
-  @IsOptional()
-  location?: string;
+  descricao!: string;
+
+  @IsString()
+  localizacao!: string;
+
+  @IsString()
+  responsavel!: string;
 
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(0)
+  cargaHoraria!: number;
+
+  @Type(() => Date)
+  @IsDate()
+  dataInicio!: Date;
+
+  @Type(() => Date)
+  @IsDate()
+  dataFim!: Date;
+
+  @IsEnum(['pendente', 'iniciada', 'andamento', 'finalizada'])
+  status!: 'pendente' | 'iniciada' | 'andamento' | 'finalizada';
+
+  @IsString()
   @IsOptional()
-  capacity?: number;
+  foto?: string;
+
+  @Type(() => Array)
+  @IsOptional()
+  atividades?: CreateActivityDto[];
 }

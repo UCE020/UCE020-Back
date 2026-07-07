@@ -1,26 +1,480 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../../db';
+import {
+  tabelaEvento,
+  tabelaParticipacoes,
+  tabelaAtividade,
+  tabelaUsuario,
+} from '../../db/schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { ActivityService } from '../activity/activity.service';
+import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
+
+export type TipoParticipante = 'participante' | 'organizador' | 'monitor';
 
 @Injectable()
 export class EventService {
-  create(createEventDto: CreateEventDto) {
-    return { success: true, data: createEventDto };
+  constructor(private readonly activityService: ActivityService) {}
+
+  private async gerarCodigoUnico(nome: string): Promise<string> {
+    const prefixo = nome
+      .replace(/[^a-zA-Z]/g, '')
+      .toUpperCase()
+      .substring(0, 3)
+      .padEnd(3, 'X');
+
+    for (let tentativas = 0; tentativas < 10; tentativas++) {
+      const sufixo = Math.floor(1000 + Math.random() * 9000).toString();
+      const codigo = `${prefixo}${sufixo}`;
+
+      const [existente] = await db
+        .select({ id: tabelaEvento.id })
+        .from(tabelaEvento)
+        .where(eq(tabelaEvento.codigo, codigo))
+        .limit(1);
+
+      if (!existente) {
+        return codigo;
+      }
+    }
+
+    return `${prefixo}${Date.now().toString().slice(-4)}`;
   }
 
-  findAll() {
-    return { success: true, data: [] };
+  async create(createEventDto: CreateEventDto, userId: number) {
+    const codigo =
+      createEventDto.codigo?.trim() ||
+      (await this.gerarCodigoUnico(createEventDto.nome));
+
+    const [novoEvento] = await db
+      .insert(tabelaEvento)
+      .values({
+        nome: createEventDto.nome,
+        codigo,
+        descricao: createEventDto.descricao,
+        localizacao: createEventDto.localizacao,
+        responsavel: createEventDto.responsavel,
+        cargaHoraria: createEventDto.cargaHoraria,
+        dataInicio: createEventDto.dataInicio,
+        dataFim: createEventDto.dataFim,
+        status: createEventDto.status,
+        foto: createEventDto.foto,
+      })
+      .returning();
+
+    // Registra o criador como organizador do evento
+    await db.insert(tabelaParticipacoes).values({
+      usuarioId: userId,
+      eventoId: novoEvento.id,
+      tipo: 'organizador',
+    });
+
+    const atividadesCriadas: any[] = [];
+    const atividadesComErro: { input: any; error: string }[] = [];
+
+    if (createEventDto.atividades?.length) {
+      for (const atividadeDto of createEventDto.atividades) {
+        try {
+          const resultado = await this.activityService.create({
+            dto: {
+              eventId: novoEvento.id,
+              name: atividadeDto.name,
+              description: atividadeDto.description,
+              location: atividadeDto.location,
+              category: atividadeDto.category,
+              workload: atividadeDto.workload,
+              startDate: atividadeDto.startDate,
+              endDate: atividadeDto.endDate,
+              guests: atividadeDto.guests,
+            },
+            userId,
+          });
+
+          atividadesCriadas.push(resultado.data.activity);
+        } catch (error) {
+          atividadesComErro.push({
+            input: atividadeDto,
+            error: error instanceof Error ? error.message : 'Erro desconhecido',
+          });
+        }
+      }
+    }
+
+    return {
+      message:
+        atividadesComErro.length > 0
+          ? 'Evento criado com sucesso, mas algumas atividades não puderam ser criadas.'
+          : 'Evento criado com sucesso.',
+      data: {
+        ...novoEvento,
+        atividades: atividadesCriadas,
+        ...(atividadesComErro.length > 0 && { atividadesComErro }),
+      },
+    };
   }
 
-  findOne(id: number) {
-    return { success: true, data: { id } };
+  async findAll() {
+    const eventos = await db
+      .select()
+      .from(tabelaEvento)
+      .orderBy(tabelaEvento.dataInicio);
+
+    return {
+      message: 'Eventos listados com sucesso.',
+      data: eventos,
+    };
   }
 
-  update(id: number, updateEventDto: UpdateEventDto) {
-    return { success: true, data: { id, ...updateEventDto } };
+  async findByCodigo(codigo: string) {
+    const [evento] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.codigo, codigo))
+      .limit(1);
+
+    if (!evento) {
+      throw new NotFoundException(
+        `Evento com código "${codigo}" não encontrado.`,
+      );
+    }
+
+    return {
+      message: 'Evento encontrado.',
+      data: evento,
+    };
   }
 
-  remove(id: number) {
-    return { success: true, data: { id } };
+  async findEventsByUser(
+    userId: number,
+    tipo?: TipoParticipante,
+  ): Promise<{ message: string; data: Array<Record<string, unknown>> }> {
+    const filtros = [eq(tabelaParticipacoes.usuarioId, userId)];
+
+    if (tipo) {
+      filtros.push(eq(tabelaParticipacoes.tipo, tipo));
+    }
+
+    const eventos = await db
+      .select({ evento: tabelaEvento })
+      .from(tabelaEvento)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(tabelaParticipacoes.eventoId, tabelaEvento.id),
+      )
+      .where(and(...filtros))
+      .orderBy(tabelaEvento.dataInicio);
+
+    return {
+      message: 'Eventos do usuário listados com sucesso.',
+      data: eventos.map((row) => row.evento),
+    };
+  }
+
+  async findOne(id: number) {
+    const evento = await db.query.tabelaEvento.findFirst({
+      where: eq(tabelaEvento.id, id),
+      with: {
+        atividades: {
+          with: {
+            convidados: {
+              with: {
+                convidado: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!evento) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    const atividadesFormatadas = evento.atividades.map((atividade) => ({
+      id: atividade.id,
+      name: atividade.nome,
+      description: atividade.descricao,
+      location: atividade.localizacao,
+      category: atividade.categoria,
+      workload: atividade.cargaHoraria,
+      startDate: atividade.dataInicio,
+      endDate: atividade.dataFim,
+      eventId: atividade.eventoId,
+      guests: atividade.convidados.map((vinculo) => ({
+        id: vinculo.convidado.id,
+        name: vinculo.convidado.nome,
+        email: vinculo.convidado.email,
+        role: vinculo.funcao,
+      })),
+    }));
+
+    return {
+      message: 'Evento encontrado.',
+      data: {
+        ...evento,
+        atividades: atividadesFormatadas,
+      },
+    };
+  }
+
+  async update(id: number, updateEventDto: UpdateEventDto, userId: number) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    await assertEventOrganizer(userId, eventoExistente.id);
+    
+
+    const { atividades, ...dadosEvento } = updateEventDto;
+
+    const [eventoAtualizado] = await db
+      .update(tabelaEvento)
+      .set(dadosEvento)
+      .where(eq(tabelaEvento.id, id))
+      .returning();
+
+    const atividadesAtualizadas: any[] = [];
+    const atividadesComErro: { input: any; error: string }[] = [];
+
+    if (atividades !== undefined) {
+      const atividadesExistentes = await db
+        .select({ id: tabelaAtividade.id })
+        .from(tabelaAtividade)
+        .where(eq(tabelaAtividade.eventoId, id));
+
+      const idsExistentes = atividadesExistentes.map((a) => a.id);
+      const idsRecebidos = atividades
+        .filter((a) => a.id !== undefined)
+        .map((a) => a.id as number);
+
+      const idsParaRemover = idsExistentes.filter(
+        (existenteId) => !idsRecebidos.includes(existenteId),
+      );
+
+      for (const atividadeId of idsParaRemover) {
+        try {
+          await this.activityService.remove({ id: atividadeId, userId });
+        } catch (error) {
+          atividadesComErro.push({
+            input: { id: atividadeId },
+            error: error instanceof Error ? error.message : 'Erro desconhecido',
+          });
+        }
+      }
+
+      for (const atividadeDto of atividades) {
+        try {
+          if (atividadeDto.id) {
+            const resultado = await this.activityService.update({
+              id: atividadeDto.id,
+              dto: {
+                name: atividadeDto.name,
+                description: atividadeDto.description,
+                location: atividadeDto.location,
+                category: atividadeDto.category,
+                workload: atividadeDto.workload,
+                startDate: atividadeDto.startDate,
+                endDate: atividadeDto.endDate,
+                guests: atividadeDto.guests,
+                eventId: atividadeDto.eventId,
+              },
+              userId,
+            });
+            atividadesAtualizadas.push(resultado.data.activity);
+          } else {
+            const resultado = await this.activityService.create({
+              dto: {
+                eventId: id,
+                name: atividadeDto.name,
+                description: atividadeDto.description,
+                location: atividadeDto.location,
+                category: atividadeDto.category,
+                workload: atividadeDto.workload,
+                startDate: atividadeDto.startDate,
+                endDate: atividadeDto.endDate,
+                guests: atividadeDto.guests,
+              },
+              userId,
+            });
+            atividadesAtualizadas.push(resultado.data.activity);
+          }
+        } catch (error) {
+          atividadesComErro.push({
+            input: atividadeDto,
+            error: error instanceof Error ? error.message : 'Erro desconhecido',
+          });
+        }
+      }
+    }
+
+    return {
+      message:
+        atividadesComErro.length > 0
+          ? 'Evento atualizado com sucesso, mas algumas atividades não puderam ser processadas.'
+          : 'Evento atualizado com sucesso.',
+      data: {
+        ...eventoAtualizado,
+        atividades: atividadesAtualizadas,
+        ...(atividadesComErro.length > 0 && { atividadesComErro }),
+      },
+    };
+  }
+
+  async remove(id: number) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    await db.delete(tabelaEvento).where(eq(tabelaEvento.id, id));
+
+    return {
+      message: 'Evento removido com sucesso.',
+      data: eventoExistente,
+    };
+  }
+
+  // Métodos auxiliares para membros
+
+  async checkIsOrganizer(eventId: number, userId: number): Promise<void> {
+    const [participacao] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.tipo, 'organizador'),
+        ),
+      )
+      .limit(1);
+
+    if (!participacao) {
+      throw new ForbiddenException(
+        'Apenas organizadores podem gerenciar membros.',
+      );
+    }
+  }
+
+  // Membros do Evento
+
+  async getEventMembers(eventId: number) {
+    await this.findOne(eventId); // Garante que o evento existe
+
+    const membros = await db
+      .select({
+        id: tabelaParticipacoes.id,
+        usuarioId: tabelaParticipacoes.usuarioId,
+        tipo: tabelaParticipacoes.tipo,
+        nome: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+      })
+      .from(tabelaParticipacoes)
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
+      )
+      .where(eq(tabelaParticipacoes.eventoId, eventId));
+
+    return {
+      message: 'Membros do evento listados com sucesso.',
+      data: membros,
+    };
+  }
+
+  async updateEventMember(
+    eventId: number,
+    memberUserId: number,
+    tipo: TipoParticipante,
+    requesterId: number,
+  ) {
+    await this.checkIsOrganizer(eventId, requesterId);
+
+    const [participacaoExistente] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .limit(1);
+
+    if (!participacaoExistente) {
+      throw new NotFoundException(`Membro não encontrado neste evento.`);
+    }
+
+    const [participacaoAtualizada] = await db
+      .update(tabelaParticipacoes)
+      .set({ tipo })
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .returning();
+
+    return {
+      message: 'Papel do membro atualizado com sucesso.',
+      data: participacaoAtualizada,
+    };
+  }
+
+  async removeEventMember(
+    eventId: number,
+    memberUserId: number,
+    requesterId: number,
+  ) {
+    await this.checkIsOrganizer(eventId, requesterId);
+
+    // Não permitir que o organizador se remova caso seja o único organizador (opcional, mas recomendado evitar se remover sem querer)
+    // Para simplificar a task, apenas processamos a remoção básica:
+    const [participacaoExistente] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      )
+      .limit(1);
+
+    if (!participacaoExistente) {
+      throw new NotFoundException(`Membro não encontrado neste evento.`);
+    }
+
+    await db
+      .delete(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventId),
+          eq(tabelaParticipacoes.usuarioId, memberUserId),
+        ),
+      );
+
+    return {
+      message: 'Membro removido do evento com sucesso.',
+      data: participacaoExistente,
+    };
   }
 }

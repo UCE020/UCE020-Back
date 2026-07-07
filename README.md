@@ -59,7 +59,7 @@ npm run db:push
 npm run start:dev
 ```
 
-A API estará disponível em `http://localhost:3000`.
+A API estará disponível em `http://localhost:3001`.
 
 ---
 
@@ -119,7 +119,7 @@ test/
 ## 🧪 Verificando o Setup
 
 Com a aplicação rodando, acesse:
-GET http://localhost:3000/api/v1/health
+GET http://localhost:3001/api/v1/health
 
 Resposta esperada:
 

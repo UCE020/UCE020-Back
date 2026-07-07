@@ -8,6 +8,7 @@ import { Response } from 'express';
 
 interface ResponseShape<T> {
   data: T;
+  message?: string;
   statusCode: number;
 }
 
@@ -15,8 +16,24 @@ interface ResponseShape<T> {
 export class ResponseInterceptor<T> implements NestInterceptor<T, ResponseShape<T>> {
   intercept(context: ExecutionContext, next: CallHandler<T>): Observable<ResponseShape<T>> {
     const statusCode = context.switchToHttp().getResponse<Response>().statusCode;
+    
     return next.handle().pipe(
-      map(data => ({ data, statusCode })),
+      map(body => {
+        const responseBody = body as Record<string, unknown>;
+
+        if (responseBody && typeof responseBody === 'object' && 'message' in responseBody && 'data' in responseBody) {
+          return {
+            statusCode,
+            message: String(responseBody.message),
+            data: responseBody.data as T,
+          };
+        }
+
+        return {
+          statusCode,
+          data: body as T,
+        };
+      }),
     );
   }
 }
