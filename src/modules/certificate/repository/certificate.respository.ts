@@ -42,4 +42,19 @@ export class CertificateRepository {
       .where(eq(tabelaAtividade.eventoId, eventoId));
     return result[0]?.count ?? 0;
   }
+
+  async countByRole(eventoId: number): Promise<{ role: string; count: number }[]> {
+    return db
+      .select({
+        role:  tabelaParticipacoes.tipo,
+        count: sql<number>`count(distinct ${tabelaCertificadoEvento.id})::int`,
+      })
+      .from(tabelaCertificadoEvento)
+      .innerJoin(tabelaAtividade, eq(tabelaCertificadoEvento.eventoId, tabelaAtividade.id))
+      .innerJoin(tabelaParticipacoes, eq(
+        tabelaParticipacoes.usuarioId, tabelaCertificadoEvento.usuarioId,
+      ))
+      .where(eq(tabelaAtividade.eventoId, eventoId))
+      .groupBy(tabelaParticipacoes.tipo);
+  }
 }

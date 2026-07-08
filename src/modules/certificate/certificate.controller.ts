@@ -38,4 +38,13 @@ export class CertificateController {
   ) {
     return this.certificateService.getCertificatesByEvent(eventoId, page, limit);
   }
+
+  @Get('stats')
+  @ApiOkResponse({ description: 'Quantidade de certificados emitidos por papel (ouvinte, monitor, organizador, palestrante)' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  getCertificateStatsByEvent(
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+  ) {
+    return this.certificateService.getCertificateStatsByEvent(eventoId);
+  }
 }

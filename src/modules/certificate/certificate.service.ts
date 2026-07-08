@@ -26,6 +26,16 @@ async getCertificatesByEvent(eventoId: number, page: number, limit: number) {
   }));
 }
 
+  async getCertificateStatsByEvent(eventoId: number) {
+    const rows = await this.repo.countByRole(eventoId);
+    const counts = new Map(rows.map(row => [this.mapRole(row.role), row.count]));
+
+    return ['Ouvinte', 'Monitor', 'Organizador', 'Palestrante'].map(role => ({
+      role,
+      count: counts.get(role) ?? 0,
+    }));
+  }
+
   private mapRole(role: string): string {
     const map: Record<string, string> = {
       participante: 'Ouvinte',
