@@ -2,9 +2,8 @@ import { Request } from 'express';
 
 export interface RequestWithUser extends Request {
   user: {
-    id: number;
-    nome: string;
+    sub: number;
+    name: string;
     email: string;
-    isActive: boolean;
   };
 }

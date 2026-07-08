@@ -1,36 +1,82 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import {
-  ApiBearerAuth, ApiBadRequestResponse, ApiConflictResponse,
-  ApiNotFoundResponse, ApiOkResponse, ApiTags, ApiUnauthorizedResponse,
+  Body, Controller, Get, HttpCode, HttpStatus, Patch, Post,
+  Req, UploadedFile, UseGuards, UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth, ApiBadRequestResponse, ApiBody, ApiConflictResponse,
+  ApiConsumes, ApiNotFoundResponse, ApiOkResponse, ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { JwtPayload } from 'src/common/types/jwt-payload.type';
-import { UserResponseDto } from './dto/user-response.dto';
-import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { UserService } from './user.service';
+import { UserResponseDto } from './dto/user-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { User } from 'src/common/decorators/usuario.decorator';
+import { ChangePasswordDto } from './dto/change-password.dto';
+// TODO: trocar pelo serviço de storage real do projeto (S3, disco, etc.).
+// Aqui ele é só um contrato: recebe o arquivo e devolve a URL final salva.
+import { AvatarStorageService } from './avatar-storage.service';
+import 'multer';
+import type { Request } from 'express';
+import { JwtPayload } from 'src/common/types/jwt-payload.type';
 
-@ApiTags('profile')
+interface AuthenticatedRequest extends Request {
+  user: JwtPayload;
+}
+
+@ApiTags('me')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('user/me')
-export class ProfileController {
-  constructor(private readonly userService: UserService) {}
+@Controller('me')
+export class UserProfileController {
+  constructor(
+    private readonly userService: UserService,
+    private readonly avatarStorage: AvatarStorageService,
+  ) {}
 
   @Get()
   @ApiOkResponse({ description: 'Perfil do usuário autenticado', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
-  getProfile(@User() user: JwtPayload) {
-    return this.userService.getUser(user.sub);
+  getProfile(@Req() req: AuthenticatedRequest) {
+    return this.userService.getUser(req.user.sub);
   }
 
   @Patch()
   @ApiOkResponse({ description: 'Perfil atualizado com sucesso', type: UserResponseDto })
-  @ApiBadRequestResponse({ description: 'Body vazio ou campo não permitido' })
+  @ApiBadRequestResponse({ description: 'Dados inválidos' })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
   @ApiConflictResponse({ description: 'E-mail já está em uso' })
-  updateProfile(@User() user: JwtPayload, @Body() dto: UpdateProfileDto) {
-    return this.userService.updateProfile(user.sub, dto);
+  updateProfile(@Req() req: AuthenticatedRequest, @Body() dto: UpdateProfileDto) {
+    return this.userService.updateProfile(req.user.sub, dto);
+  }
+
+  @Patch('senha')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'Senha alterada com sucesso' })
+  @ApiBadRequestResponse({ description: 'Senha atual incorreta ou nova senha inválida' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  changePassword(@Req() req: AuthenticatedRequest, @Body() dto: ChangePasswordDto) {
+    return this.userService.changePassword(req.user.sub, dto);
+  }
+
+  @Post('foto')
+  @UseInterceptors(FileInterceptor('foto'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { foto: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({ description: 'Foto de perfil atualizada com sucesso', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'Nenhuma imagem enviada ou formato inválido' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  async updateAvatar(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+    const avatarUrl = await this.avatarStorage.save(req.user.sub, file);
+    return this.userService.updateAvatar(req.user.sub, avatarUrl);
   }
 }
