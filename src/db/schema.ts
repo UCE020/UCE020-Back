@@ -132,6 +132,8 @@ export const tabelaParticipacoesAtividades = pgTable(
     atividadeId: integer('atividade_id')
       .notNull()
       .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
+    presente: boolean('presente').notNull().default(false),
+    dataPresenca: timestamp('data_presenca'),
   },
 );
 

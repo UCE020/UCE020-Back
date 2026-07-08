@@ -60,12 +60,20 @@ export class ActivityController {
   subscribe(
     @Param('id') id: string,
     @Body() subscribeActivityDto: SubscribeActivityDto,
+    @Req() req: RequestWithUser,
   ) {
-    return this.activityService.subscribe(+id, subscribeActivityDto);
+    return this.activityService.subscribe(+id, {
+      userId: subscribeActivityDto?.userId ?? req.user.id,
+    });
+  }
+
+  @Delete(':id/unsubscribe')
+  unsubscribe(@Param('id') id: string, @Req() req: RequestWithUser) {
+    return this.activityService.unsubscribe(+id, req.user.id);
   }
 
   @Delete(':id/unsubscribe/:userId')
-  unsubscribe(@Param('id') id: string, @Param('userId') userId: string) {
+  unsubscribeByUserId(@Param('id') id: string, @Param('userId') userId: string) {
     return this.activityService.unsubscribe(+id, +userId);
   }
 
