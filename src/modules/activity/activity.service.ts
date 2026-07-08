@@ -1,13 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { eq, and } from 'drizzle-orm';
 import { db } from 'src/db';
 import {
   tabelaAtividade,
   tabelaConvidado,
   tabelaConvidadoAtividade,
+  tabelaParticipacoes,
+  tabelaParticipacoesAtividades,
 } from 'src/db/schema';
-import { eq } from 'drizzle-orm';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-acitivity.dto';
+import { SubscribeActivityDto } from './dto/subscribe-activity.dto';
 import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
 import { assertEventActive } from 'src/common/helpers/assert-event-active.helper';
 import { assertActivityDates } from 'src/common/helpers/assert-activity-dates.helper';
@@ -226,6 +233,148 @@ export class ActivityService {
           ...this.mapActivity(result.updatedActivity),
           guests: result.guests,
         },
+      },
+    };
+  }
+
+  async subscribe(id: number, subscribeActivityDto: SubscribeActivityDto) {
+    const { userId } = subscribeActivityDto;
+
+    const activity = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    if (!activity.length) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const activityData = activity[0];
+
+    const participation = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, activityData.eventoId),
+        ),
+      );
+
+    let participationId: number;
+
+    if (!participation.length) {
+      const createdParticipation = await db
+        .insert(tabelaParticipacoes)
+        .values({
+          usuarioId: userId,
+          eventoId: activityData.eventoId,
+          tipo: 'participante',
+        })
+        .returning();
+
+      participationId = createdParticipation[0].id;
+    } else {
+      participationId = participation[0].id;
+    }
+
+    const existingSubscription = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    if (existingSubscription.length) {
+      throw new BadRequestException('Usuário já inscrito nesta atividade');
+    }
+
+    await db.insert(tabelaParticipacoesAtividades).values({
+      participacaoId: participationId,
+      atividadeId: id,
+    });
+
+    return {
+      success: true,
+      data: {
+        activityId: id,
+        userId,
+        participationId,
+      },
+    };
+  }
+
+  async unsubscribe(id: number, userId: number) {
+    const activity = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    if (!activity.length) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const activityData = activity[0];
+
+    const participation = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, activityData.eventoId),
+        ),
+      );
+
+    if (!participation.length) {
+      throw new NotFoundException('Participação não encontrada para este usuário');
+    }
+
+    const participationId = participation[0].id;
+
+    const existingSubscription = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    if (!existingSubscription.length) {
+      throw new BadRequestException('Usuário não está inscrito nesta atividade');
+    }
+
+    await db
+      .delete(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    const remainingSubscriptions = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(eq(tabelaParticipacoesAtividades.participacaoId, participationId));
+
+    if (!remainingSubscriptions.length) {
+      await db
+        .delete(tabelaParticipacoes)
+        .where(eq(tabelaParticipacoes.id, participationId));
+    }
+
+    return {
+      success: true,
+      data: {
+        activityId: id,
+        userId,
+        participationId,
       },
     };
   }

@@ -17,6 +17,7 @@ import { UpdateActivityDto } from './dto/update-acitivity.dto';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
 import type { RequestWithUser } from 'src/common/types/request-with-user.type';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { SubscribeActivityDto } from './dto/subscribe-activity.dto';
 
 @ApiTags('activity')
 @ApiBearerAuth() // 🚀 Indica que o Swagger precisa do Token JWT para testar estes endpoints
@@ -53,6 +54,19 @@ export class ActivityController {
   @ApiResponse({ status: 404, description: 'Atividade não encontrada.' })
   findOne(@Param('id') id: string) {
     return this.activityService.findOne(+id);
+  }
+
+  @Post(':id/subscribe')
+  subscribe(
+    @Param('id') id: string,
+    @Body() subscribeActivityDto: SubscribeActivityDto,
+  ) {
+    return this.activityService.subscribe(+id, subscribeActivityDto);
+  }
+
+  @Delete(':id/unsubscribe/:userId')
+  unsubscribe(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.activityService.unsubscribe(+id, +userId);
   }
 
   @Patch(':id')
