@@ -45,6 +45,7 @@ export const tabelaUsuario = pgTable('usuario', {
   nome: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
   senha: text('senha').notNull(),
+  avatarUrl: text('avatar_url'),
   isActive: boolean('is_active').notNull().default(false),
   resetPasswordToken: text('reset_password_token'),
   resetPasswordExpires: timestamp('reset_password_expires'),

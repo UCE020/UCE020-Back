@@ -1,284 +1,218 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src/db';
 import {
   tabelaAtividade,
-  tabelaConvidado,
-  tabelaConvidadoAtividade,
   tabelaParticipacoes,
   tabelaParticipacoesAtividades,
+  tabelaUsuario,
 } from 'src/db/schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
-import { UpdateActivityDto } from './dto/update-acitivity.dto';
-import { SubscribeActivityDto } from './dto/subscribe-activity.dto';
-import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
-import { assertEventActive } from 'src/common/helpers/assert-event-active.helper';
-import { assertActivityDates } from 'src/common/helpers/assert-activity-dates.helper';
-import { GuestResult } from './types/activity.type';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
+import { UpdateActivityDto } from './dto/update-acitivity.dto';
 
 @Injectable()
 export class ActivityService {
   async create({ dto, userId }: { dto: CreateActivityDto; userId: number }) {
-    await assertEventOrganizer(userId, dto.eventId);
-    const evento = await assertEventActive(dto.eventId);
-    assertActivityDates(new Date(dto.startDate), new Date(dto.endDate), evento);
+    void userId;
 
-    const result = await db.transaction(async (tx) => {
-      const [activity] = await tx
-        .insert(tabelaAtividade)
-        .values({
-          nome: dto.name,
-          descricao: dto.description,
-          localizacao: dto.location,
-          categoria: dto.category,
-          cargaHoraria: dto.workload ?? 0,
-          dataInicio: new Date(dto.startDate),
-          dataFim: new Date(dto.endDate),
-          status: 'pendente',
-          eventoId: dto.eventId,
-        })
-        .returning();
+    const createdActivities = await db
+      .insert(tabelaAtividade)
+      .values({
+        nome: dto.name,
+        descricao: dto.description,
+        localizacao: dto.location,
+        dataInicio: new Date(dto.startDate),
+        dataFim: new Date(dto.endDate),
+        categoria: dto.category,
+        cargaHoraria: dto.workload ?? 0,
+        status: 'pendente',
+        eventoId: dto.eventId,
+      })
+      .returning();
 
-      const guests: GuestResult[] = [];
+    const createdActivity = createdActivities.at(0);
 
-      if (dto.guests?.length) {
-        for (const guest of dto.guests) {
-          let [existing] = await tx
-            .select()
-            .from(tabelaConvidado)
-            .where(eq(tabelaConvidado.email, guest.email));
-
-          if (!existing) {
-            [existing] = await tx
-              .insert(tabelaConvidado)
-              .values({ nome: guest.name, email: guest.email })
-              .returning();
-          }
-
-          await tx.insert(tabelaConvidadoAtividade).values({
-            convidadoId: existing.id,
-            atividadeId: activity.id,
-            funcao: guest.role,
-          });
-
-          guests.push({
-            id: existing.id,
-            name: existing.nome,
-            email: existing.email,
-            role: guest.role,
-          });
-        }
-      }
-
-      return { activity, guests };
-    });
+    if (!createdActivity) {
+      throw new BadRequestException('Não foi possível criar a atividade');
+    }
 
     return {
-      message: 'Atividade criada com sucesso.',
+      success: true,
       data: {
-        activity: {
-          ...this.mapActivity(result.activity),
-          guests: result.guests,
-        },
+        activity: createdActivity,
       },
     };
   }
 
   async findAll(query: FindAllActivitiesDto) {
-    const baseQuery = db.select().from(tabelaAtividade);
+    void query;
 
-    if (query.eventId) {
-      baseQuery.where(eq(tabelaAtividade.eventoId, query.eventId));
-    }
-
-    const activities = await baseQuery;
+    const activities = await db.select().from(tabelaAtividade);
 
     return {
-      message: 'Atividades listadas com sucesso.',
-      data: {
-        activities: activities.map((a) => this.mapActivity(a)),
-      },
+      success: true,
+      data: activities,
     };
   }
 
-  async findOne(id: number) {
-    const rows = await db
-      .select({
-        atividade: tabelaAtividade,
-        convidado: tabelaConvidado,
-        funcao: tabelaConvidadoAtividade.funcao,
-      })
-      .from(tabelaAtividade)
-      .leftJoin(
-        tabelaConvidadoAtividade,
-        eq(tabelaConvidadoAtividade.atividadeId, tabelaAtividade.id),
-      )
-      .leftJoin(
-        tabelaConvidado,
-        eq(tabelaConvidado.id, tabelaConvidadoAtividade.convidadoId),
-      )
-      .where(eq(tabelaAtividade.id, id));
-
-    if (!rows.length) {
-      throw new NotFoundException('Atividade não encontrada.');
-    }
-
-    const atividadeBase = rows[0].atividade;
-
-    const guests = rows
-      .filter((row) => row.convidado !== null)
-      .map((row) => ({
-        id: row.convidado!.id,
-        name: row.convidado!.nome,
-        email: row.convidado!.email,
-        role: row.funcao!,
-      }));
-
-    return {
-      message: 'Atividade encontrada com sucesso.',
-      data: {
-        activity: {
-          ...this.mapActivity(atividadeBase),
-          guests,
-        },
-      },
-    };
-  }
-
-  async update({
-    id,
-    dto,
-    userId,
-  }: {
-    id: number;
-    dto: UpdateActivityDto;
-    userId: number;
-  }) {
-    const existing = await db
-      .select()
-      .from(tabelaAtividade)
-      .where(eq(tabelaAtividade.id, id))
-      .limit(1);
-
-    if (!existing.length) {
-      throw new NotFoundException('Atividade não encontrada.');
-    }
-
-    await assertEventOrganizer(userId, existing[0].eventoId);
-
-    const result = await db.transaction(async (tx) => {
-      const [updatedActivity] = await tx
-        .update(tabelaAtividade)
-        .set({
-          ...(dto.name && { nome: dto.name }),
-          ...(dto.description && { descricao: dto.description }),
-          ...(dto.location && { localizacao: dto.location }),
-          ...(dto.category && { categoria: dto.category }),
-          ...(dto.workload !== undefined && { cargaHoraria: dto.workload }),
-          ...(dto.startDate && { dataInicio: new Date(dto.startDate) }),
-          ...(dto.endDate && { dataFim: new Date(dto.endDate) }),
-        })
-        .where(eq(tabelaAtividade.id, id))
-        .returning();
-
-      const guests: GuestResult[] = [];
-
-      if (dto.guests !== undefined) {
-        await tx
-          .delete(tabelaConvidadoAtividade)
-          .where(eq(tabelaConvidadoAtividade.atividadeId, id));
-
-        if (dto.guests.length > 0) {
-          for (const guest of dto.guests) {
-            let [existingGuest] = await tx
-              .select()
-              .from(tabelaConvidado)
-              .where(eq(tabelaConvidado.email, guest.email));
-
-            if (!existingGuest) {
-              [existingGuest] = await tx
-                .insert(tabelaConvidado)
-                .values({ nome: guest.name, email: guest.email })
-                .returning();
-            }
-
-            await tx.insert(tabelaConvidadoAtividade).values({
-              convidadoId: existingGuest.id,
-              atividadeId: id,
-              funcao: guest.role,
-            });
-
-            guests.push({
-              id: existingGuest.id,
-              name: existingGuest.nome,
-              email: existingGuest.email,
-              role: guest.role,
-            });
-          }
-        }
-      }
-
-      return { updatedActivity, guests };
-    });
-
-    return {
-      message: 'Atividade atualizada com sucesso.',
-      data: {
-        activity: {
-          ...this.mapActivity(result.updatedActivity),
-          guests: result.guests,
-        },
-      },
-    };
-  }
-
-  async subscribe(id: number, subscribeActivityDto: SubscribeActivityDto) {
-    const { userId } = subscribeActivityDto;
-
-    const activity = await db
+  async findParticipants(id: number): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      presenceStatus: 'pending' | 'confirmed';
+    }>;
+  }> {
+    const activities = await db
       .select()
       .from(tabelaAtividade)
       .where(eq(tabelaAtividade.id, id));
 
-    if (!activity.length) {
+    const activity = activities.at(0);
+
+    if (!activity) {
       throw new NotFoundException('Atividade não encontrada');
     }
 
-    const activityData = activity[0];
+    const participants = await db
+      .select({
+        id: tabelaUsuario.id,
+        name: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+        role: tabelaParticipacoes.tipo,
+      })
+      .from(tabelaParticipacoesAtividades)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(
+          tabelaParticipacoes.id,
+          tabelaParticipacoesAtividades.participacaoId,
+        ),
+      )
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaUsuario.id, tabelaParticipacoes.usuarioId),
+      )
+      .where(eq(tabelaParticipacoesAtividades.atividadeId, id))
+      .orderBy(asc(tabelaUsuario.nome));
 
-    const participation = await db
+    return {
+      success: true,
+      data: participants.map((participant) => ({
+        id: String(participant.id),
+        name: participant.name,
+        email: participant.email,
+        role: participant.role,
+        presenceStatus: 'pending',
+      })),
+    };
+  }
+
+  async findOne(id: number, userId?: number) {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    let isRegistered = false;
+
+    if (typeof userId === 'number') {
+      const participations = await db
+        .select()
+        .from(tabelaParticipacoes)
+        .where(
+          and(
+            eq(tabelaParticipacoes.usuarioId, userId),
+            eq(tabelaParticipacoes.eventoId, activity.eventoId),
+          ),
+        );
+
+      const participation = participations.at(0);
+
+      if (participation) {
+        const existingSubscriptions = await db
+          .select()
+          .from(tabelaParticipacoesAtividades)
+          .where(
+            and(
+              eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
+              eq(tabelaParticipacoesAtividades.atividadeId, id),
+            ),
+          );
+
+        isRegistered = existingSubscriptions.length > 0;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        ...activity,
+        isRegistered,
+      },
+    };
+  }
+
+  async subscribe(id: number, userId: number) {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const participations = await db
       .select()
       .from(tabelaParticipacoes)
       .where(
         and(
           eq(tabelaParticipacoes.usuarioId, userId),
-          eq(tabelaParticipacoes.eventoId, activityData.eventoId),
+          eq(tabelaParticipacoes.eventoId, activity.eventoId),
         ),
       );
 
     let participationId: number;
+    const participation = participations.at(0);
 
-    if (!participation.length) {
-      const createdParticipation = await db
+    if (!participation) {
+      const createdParticipations = await db
         .insert(tabelaParticipacoes)
         .values({
           usuarioId: userId,
-          eventoId: activityData.eventoId,
+          eventoId: activity.eventoId,
           tipo: 'participante',
         })
         .returning();
 
-      participationId = createdParticipation[0].id;
+      const createdParticipation = createdParticipations.at(0);
+
+      if (!createdParticipation) {
+        throw new BadRequestException('Não foi possível criar a participação');
+      }
+
+      participationId = createdParticipation.id;
     } else {
-      participationId = participation[0].id;
+      participationId = participation.id;
     }
 
-    const existingSubscription = await db
+    const existingSubscriptions = await db
       .select()
       .from(tabelaParticipacoesAtividades)
       .where(
@@ -288,7 +222,7 @@ export class ActivityService {
         ),
       );
 
-    if (existingSubscription.length) {
+    if (existingSubscriptions.length > 0) {
       throw new BadRequestException('Usuário já inscrito nesta atividade');
     }
 
@@ -308,110 +242,141 @@ export class ActivityService {
   }
 
   async unsubscribe(id: number, userId: number) {
-    const activity = await db
+    const activities = await db
       .select()
       .from(tabelaAtividade)
       .where(eq(tabelaAtividade.id, id));
 
-    if (!activity.length) {
+    const activity = activities.at(0);
+
+    if (!activity) {
       throw new NotFoundException('Atividade não encontrada');
     }
 
-    const activityData = activity[0];
-
-    const participation = await db
+    const participations = await db
       .select()
       .from(tabelaParticipacoes)
       .where(
         and(
           eq(tabelaParticipacoes.usuarioId, userId),
-          eq(tabelaParticipacoes.eventoId, activityData.eventoId),
+          eq(tabelaParticipacoes.eventoId, activity.eventoId),
         ),
       );
 
-    if (!participation.length) {
-      throw new NotFoundException('Participação não encontrada para este usuário');
+    const participation = participations.at(0);
+
+    if (!participation) {
+      throw new NotFoundException(
+        'Participação não encontrada para este usuário',
+      );
     }
 
-    const participationId = participation[0].id;
-
-    const existingSubscription = await db
+    const existingSubscriptions = await db
       .select()
       .from(tabelaParticipacoesAtividades)
       .where(
         and(
-          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
           eq(tabelaParticipacoesAtividades.atividadeId, id),
         ),
       );
 
-    if (!existingSubscription.length) {
-      throw new BadRequestException('Usuário não está inscrito nesta atividade');
+    if (existingSubscriptions.length === 0) {
+      throw new BadRequestException(
+        'Usuário não está inscrito nesta atividade',
+      );
     }
 
     await db
       .delete(tabelaParticipacoesAtividades)
       .where(
         and(
-          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
           eq(tabelaParticipacoesAtividades.atividadeId, id),
         ),
       );
-
-    const remainingSubscriptions = await db
-      .select()
-      .from(tabelaParticipacoesAtividades)
-      .where(eq(tabelaParticipacoesAtividades.participacaoId, participationId));
-
-    if (!remainingSubscriptions.length) {
-      await db
-        .delete(tabelaParticipacoes)
-        .where(eq(tabelaParticipacoes.id, participationId));
-    }
 
     return {
       success: true,
       data: {
         activityId: id,
         userId,
-        participationId,
+        participationId: participation.id,
       },
     };
   }
 
-  async remove({ id, userId }: { id: number; userId: number }) {
-    const existing = await db
+  async update({
+    id,
+    dto,
+    userId,
+  }: {
+    id: number;
+    dto: UpdateActivityDto;
+    userId: number;
+  }) {
+    void userId;
+
+    const activities = await db
       .select()
       .from(tabelaAtividade)
-      .where(eq(tabelaAtividade.id, id))
-      .limit(1);
+      .where(eq(tabelaAtividade.id, id));
 
-    if (!existing.length) {
-      throw new NotFoundException('Atividade não encontrada.');
+    const currentActivity = activities.at(0);
+
+    if (!currentActivity) {
+      throw new NotFoundException('Atividade não encontrada');
     }
 
-    await assertEventOrganizer(userId, existing[0].eventoId);
+    const updatedActivities = await db
+      .update(tabelaAtividade)
+      .set({
+        nome: dto.name ?? currentActivity.nome,
+        descricao: dto.description ?? currentActivity.descricao,
+        localizacao: dto.location ?? currentActivity.localizacao,
+        categoria: dto.category ?? currentActivity.categoria,
+        cargaHoraria: dto.workload ?? currentActivity.cargaHoraria,
+        dataInicio: dto.startDate
+          ? new Date(dto.startDate)
+          : currentActivity.dataInicio,
+        dataFim: dto.endDate ? new Date(dto.endDate) : currentActivity.dataFim,
+      })
+      .where(eq(tabelaAtividade.id, id))
+      .returning();
+
+    const updatedActivity = updatedActivities.at(0);
+
+    if (!updatedActivity) {
+      throw new BadRequestException('Não foi possível atualizar a atividade');
+    }
+
+    return {
+      success: true,
+      data: {
+        activity: updatedActivity,
+      },
+    };
+  }
+
+  async remove({ id }: { id: number; userId: number }) {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
 
     await db.delete(tabelaAtividade).where(eq(tabelaAtividade.id, id));
 
     return {
-      message: 'Atividade removida com sucesso.',
-      data: { id },
-    };
-  }
-
-  private mapActivity(activity: typeof tabelaAtividade.$inferSelect) {
-    return {
-      id: activity.id,
-      name: activity.nome,
-      description: activity.descricao,
-      location: activity.localizacao,
-      category: activity.categoria,
-      workload: activity.cargaHoraria,
-      startDate: activity.dataInicio,
-      endDate: activity.dataFim,
-      status: activity.status,
-      eventId: activity.eventoId,
+      success: true,
+      data: {
+        activity,
+      },
     };
   }
 }
