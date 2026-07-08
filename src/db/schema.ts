@@ -161,6 +161,15 @@ export const tabelaCertificadoAtividade = pgTable('certificado_atividade', {
   arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
 });
 
+// TODO(certificado-convidado): convidados (palestrante/ministrante/moderador) não são
+// tabelaUsuario, então hoje não existe nenhuma forma de emitir certificado para eles —
+// nem certificado_evento nem certificado_atividade aceitam convidadoId. O card
+// "Palestrantes" na tela de certificados gerados sempre mostra 0 por causa disso.
+// Decisão pendente com o time: criar uma tabela certificado_convidado própria, ou
+// tornar usuarioId opcional em certificado_evento/certificado_atividade e adicionar
+// um convidadoId opcional. Também falta decidir se o card deve contar só
+// funcao = 'palestrante' ou todo convidado certificado (palestrante/ministrante/moderador).
+
 //Relações
 
 //Relacionamento de usuário
