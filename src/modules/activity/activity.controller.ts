@@ -26,14 +26,14 @@ import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import { SubscribeActivityDto } from './dto/subscribe-activity.dto';
 
 @ApiTags('activity')
-@ApiBearerAuth() // 🚀 Indica que o Swagger precisa do Token JWT para testar estes endpoints
+@ApiBearerAuth()
 @Controller('activity')
 @UseGuards(JwtAuthGuard)
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
   private getAuthenticatedUserId(req: RequestWithUser): number {
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (userId === undefined) {
       throw new UnauthorizedException('Usuário não autenticado');
