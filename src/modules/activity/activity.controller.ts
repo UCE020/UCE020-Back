@@ -9,7 +9,6 @@ import {
   Req,
   UseGuards,
   Query,
-  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -32,16 +31,6 @@ import { SubscribeActivityDto } from './dto/subscribe-activity.dto';
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
-  private getAuthenticatedUserId(req: RequestWithUser): number {
-    const userId = req.user?.sub;
-
-    if (userId === undefined) {
-      throw new UnauthorizedException('Usuário não autenticado');
-    }
-
-    return userId;
-  }
-
   @Post()
   @ApiOperation({ summary: 'Criar uma nova atividade para um evento' })
   @ApiResponse({ status: 201, description: 'Atividade criada com sucesso.' })
@@ -56,7 +45,7 @@ export class ActivityController {
   ) {
     return this.activityService.create({
       dto: createActivityDto,
-      userId: this.getAuthenticatedUserId(req),
+      userId: req.user.id,
     });
   }
 
@@ -87,16 +76,13 @@ export class ActivityController {
     @Req() req: RequestWithUser,
   ) {
     return this.activityService.subscribe(+id, {
-      userId: subscribeActivityDto?.userId ?? this.getAuthenticatedUserId(req),
+      userId: subscribeActivityDto?.userId ?? req.user.id,
     });
   }
 
   @Delete(':id/unsubscribe')
   unsubscribe(@Param('id') id: string, @Req() req: RequestWithUser) {
-    return this.activityService.unsubscribe(
-      +id,
-      this.getAuthenticatedUserId(req),
-    );
+    return this.activityService.unsubscribe(+id, req.user.id);
   }
 
   @Delete(':id/unsubscribe/:userId')
@@ -126,7 +112,7 @@ export class ActivityController {
     return this.activityService.update({
       id: +id,
       dto: updateActivityDto,
-      userId: this.getAuthenticatedUserId(req),
+      userId: req.user.id,
     });
   }
 
@@ -139,9 +125,6 @@ export class ActivityController {
   })
   @ApiResponse({ status: 404, description: 'Atividade não encontrada.' })
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
-    return this.activityService.remove({
-      id: +id,
-      userId: this.getAuthenticatedUserId(req),
-    });
+    return this.activityService.remove({ id: +id, userId: req.user.id });
   }
 }
