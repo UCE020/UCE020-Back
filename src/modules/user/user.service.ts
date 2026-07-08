@@ -2,11 +2,17 @@ import {
   BadRequestException, ConflictException,
   Injectable, NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { UserRepository } from './repository/user.repository';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
-const CAMPOS_PROIBIDOS_PERFIL = ['senha', 'senhaHash'] as const;
+// 'avatarUrl' entrou na lista: a foto agora tem rota própria
+// (updateAvatar) e não deve ser alterada pelo endpoint genérico de perfil.
+const CAMPOS_PROIBIDOS_PERFIL = ['senha', 'senhaHash', 'avatarUrl'] as const;
+
+const SALT_ROUNDS = 10;
 
 @Injectable()
 export class UserService {
@@ -30,6 +36,35 @@ export class UserService {
     }
 
     const atualizado = await this.repo.update(userId, dto);
+    if (!atualizado) throw new NotFoundException('Usuário não encontrado');
+    return atualizado;
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const usuario = await this.repo.findByIdWithPassword(userId);
+    if (!usuario) throw new NotFoundException('Usuário não encontrado');
+
+    const senhaAtualConfere = await bcrypt.compare(dto.currentPassword, usuario.senha);
+    if (!senhaAtualConfere) throw new BadRequestException('Senha atual incorreta');
+
+    const senhaIgualAAnterior = await bcrypt.compare(dto.newPassword, usuario.senha);
+    if (senhaIgualAAnterior)
+      throw new BadRequestException('A nova senha deve ser diferente da senha atual');
+
+    const senhaHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+    const atualizado = await this.repo.updatePassword(userId, senhaHash);
+    if (!atualizado) throw new NotFoundException('Usuário não encontrado');
+
+    return { message: 'Senha alterada com sucesso' };
+  }
+
+  // Recebe apenas a URL final do arquivo — o upload/armazenamento em si
+  // (S3, disco, etc.) deve ser resolvido antes de chegar aqui, tipicamente
+  // no controller ou em um serviço de storage dedicado.
+  async updateAvatar(userId: number, avatarUrl: string) {
+    if (!avatarUrl) throw new BadRequestException('Nenhuma imagem informada');
+
+    const atualizado = await this.repo.updateAvatar(userId, avatarUrl);
     if (!atualizado) throw new NotFoundException('Usuário não encontrado');
     return atualizado;
   }
