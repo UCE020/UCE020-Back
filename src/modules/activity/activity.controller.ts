@@ -62,7 +62,16 @@ export class ActivityController {
     description: 'Participantes da atividade listados com sucesso.',
   })
   @ApiResponse({ status: 404, description: 'Atividade não encontrada.' })
-  findParticipants(@Param('id') id: string) {
+  findParticipants(@Param('id') id: string): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      presenceStatus: 'pending' | 'confirmed';
+    }>;
+  }> {
     return this.activityService.findParticipants(+id);
   }
 

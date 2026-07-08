@@ -3,12 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src/db';
 import {
   tabelaAtividade,
   tabelaParticipacoes,
   tabelaParticipacoesAtividades,
+  tabelaUsuario,
 } from 'src/db/schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
@@ -56,6 +57,61 @@ export class ActivityService {
     return {
       success: true,
       data: activities,
+    };
+  }
+
+  async findParticipants(id: number): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      presenceStatus: 'pending' | 'confirmed';
+    }>;
+  }> {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const participants = await db
+      .select({
+        id: tabelaUsuario.id,
+        name: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+        role: tabelaParticipacoes.tipo,
+      })
+      .from(tabelaParticipacoesAtividades)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(
+          tabelaParticipacoes.id,
+          tabelaParticipacoesAtividades.participacaoId,
+        ),
+      )
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaUsuario.id, tabelaParticipacoes.usuarioId),
+      )
+      .where(eq(tabelaParticipacoesAtividades.atividadeId, id))
+      .orderBy(asc(tabelaUsuario.nome));
+
+    return {
+      success: true,
+      data: participants.map((participant) => ({
+        id: String(participant.id),
+        name: participant.name,
+        email: participant.email,
+        role: participant.role,
+        presenceStatus: 'pending',
+      })),
     };
   }
 
@@ -136,8 +192,6 @@ export class ActivityService {
     const participation = participations.at(0);
 
     if (!participation) {
-      console.log('USER ID NO SERVICE =>', userId);
-      console.log('EVENTO ID NO SERVICE =>', activity.eventoId);
       const createdParticipations = await db
         .insert(tabelaParticipacoes)
         .values({
@@ -228,7 +282,9 @@ export class ActivityService {
       );
 
     if (existingSubscriptions.length === 0) {
-      throw new BadRequestException('Usuário não está inscrito nesta atividade');
+      throw new BadRequestException(
+        'Usuário não está inscrito nesta atividade',
+      );
     }
 
     await db
