@@ -11,7 +11,7 @@ const UPLOAD_DIR = join(process.cwd(), 'uploads', 'avatars');
 
 // Base pública usada para montar a URL retornada ao front-end.
 // Em produção, isso normalmente é o domínio da API ou de um CDN.
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:3000';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001';
 
 const EXTENSOES_PERMITIDAS = ['.png', '.jpg', '.jpeg', '.webp'];
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024; // 5MB
