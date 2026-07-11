@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { db } from 'src/db';
-import { tabelaParticipacoes, tabelaEvento } from 'src/db/schema';
+import {
+  tabelaAtividade,
+  tabelaEvento,
+  tabelaParticipacoes,
+  tabelaParticipacoesAtividades,
+} from 'src/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { tabelaUsuario } from 'src/db/schema';
 
 @Injectable()
 export class ParticipationRepository {
@@ -27,6 +33,114 @@ export class ParticipationRepository {
       .where(eq(tabelaEvento.id, eventoId))
       .limit(1);
     return evento ?? null;
+  }
+
+  async findAtividadeById(atividadeId: number) {
+    const [atividade] = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, atividadeId))
+      .limit(1);
+    return atividade ?? null;
+  }
+
+  async findParticipacaoAtividade(participacaoId: number, atividadeId: number) {
+    const [participacaoAtividade] = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participacaoId),
+          eq(tabelaParticipacoesAtividades.atividadeId, atividadeId),
+        ),
+      )
+      .limit(1);
+    return participacaoAtividade ?? null;
+  }
+
+  async findParticipantsByActivity(atividadeId: number) {
+    const rows = await db
+      .select({
+        participacaoId: tabelaParticipacoesAtividades.participacaoId,
+        atividadeId: tabelaParticipacoesAtividades.atividadeId,
+        presente: tabelaParticipacoesAtividades.presente,
+        dataPresenca: tabelaParticipacoesAtividades.dataPresenca,
+        usuarioId: tabelaParticipacoes.usuarioId,
+        tipo: tabelaParticipacoes.tipo,
+        nome: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+      })
+      .from(tabelaParticipacoesAtividades)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(tabelaParticipacoesAtividades.participacaoId, tabelaParticipacoes.id),
+      )
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
+      )
+      .where(eq(tabelaParticipacoesAtividades.atividadeId, atividadeId));
+
+    return rows;
+  }
+
+  async markActivityAttendance(
+    participacaoId: number,
+    atividadeId: number,
+    dataPresenca: Date,
+  ) {
+    const [participacaoAtividade] = await db
+      .update(tabelaParticipacoesAtividades)
+      .set({
+        presente: true,
+        dataPresenca,
+      })
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participacaoId),
+          eq(tabelaParticipacoesAtividades.atividadeId, atividadeId),
+        ),
+      )
+      .returning();
+    return participacaoAtividade;
+  }
+
+  async removeActivityAttendance(participacaoId: number, atividadeId: number) {
+    const [participacaoAtividade] = await db
+      .update(tabelaParticipacoesAtividades)
+      .set({
+        presente: false,
+        dataPresenca: null,
+      })
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participacaoId),
+          eq(tabelaParticipacoesAtividades.atividadeId, atividadeId),
+        ),
+      )
+      .returning();
+    return participacaoAtividade;
+  }
+
+  async findConfirmedAttendancesForEvent(usuarioId: number, eventoId: number) {
+    const rows = await db
+      .select({
+        participacaoId: tabelaParticipacoesAtividades.participacaoId,
+      })
+      .from(tabelaParticipacoesAtividades)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(tabelaParticipacoesAtividades.participacaoId, tabelaParticipacoes.id),
+      )
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, usuarioId),
+          eq(tabelaParticipacoes.eventoId, eventoId),
+          eq(tabelaParticipacoesAtividades.presente, true),
+        ),
+      );
+
+    return rows;
   }
 
   async subscribe(usuarioId: number, eventoId: number) {

@@ -1,144 +1,317 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src/db';
 import {
   tabelaAtividade,
-  tabelaConvidado,
-  tabelaConvidadoAtividade,
+  tabelaParticipacoes,
+  tabelaParticipacoesAtividades,
+  tabelaUsuario,
 } from 'src/db/schema';
-import { eq } from 'drizzle-orm';
 import { CreateActivityDto } from './dto/create-activity.dto';
-import { UpdateActivityDto } from './dto/update-acitivity.dto';
-import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
-import { assertEventActive } from 'src/common/helpers/assert-event-active.helper';
-import { assertActivityDates } from 'src/common/helpers/assert-activity-dates.helper';
-import { GuestResult } from './types/activity.type';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
+import { UpdateActivityDto } from './dto/update-acitivity.dto';
 
 @Injectable()
 export class ActivityService {
   async create({ dto, userId }: { dto: CreateActivityDto; userId: number }) {
-    await assertEventOrganizer(userId, dto.eventId);
-    const evento = await assertEventActive(dto.eventId);
-    assertActivityDates(new Date(dto.startDate), new Date(dto.endDate), evento);
+    void userId;
 
-    const result = await db.transaction(async (tx) => {
-      const [activity] = await tx
-        .insert(tabelaAtividade)
-        .values({
-          nome: dto.name,
-          descricao: dto.description,
-          localizacao: dto.location,
-          categoria: dto.category,
-          cargaHoraria: dto.workload ?? 0,
-          dataInicio: new Date(dto.startDate),
-          dataFim: new Date(dto.endDate),
-          status: 'pendente',
-          eventoId: dto.eventId,
-        })
-        .returning();
+    const createdActivities = await db
+      .insert(tabelaAtividade)
+      .values({
+        nome: dto.name,
+        descricao: dto.description,
+        localizacao: dto.location,
+        dataInicio: new Date(dto.startDate),
+        dataFim: new Date(dto.endDate),
+        categoria: dto.category,
+        cargaHoraria: dto.workload ?? 0,
+        status: 'pendente',
+        eventoId: dto.eventId,
+      })
+      .returning();
 
-      const guests: GuestResult[] = [];
+    const createdActivity = createdActivities.at(0);
 
-      if (dto.guests?.length) {
-        for (const guest of dto.guests) {
-          let [existing] = await tx
-            .select()
-            .from(tabelaConvidado)
-            .where(eq(tabelaConvidado.email, guest.email));
-
-          if (!existing) {
-            [existing] = await tx
-              .insert(tabelaConvidado)
-              .values({ nome: guest.name, email: guest.email })
-              .returning();
-          }
-
-          await tx.insert(tabelaConvidadoAtividade).values({
-            convidadoId: existing.id,
-            atividadeId: activity.id,
-            funcao: guest.role,
-          });
-
-          guests.push({
-            id: existing.id,
-            name: existing.nome,
-            email: existing.email,
-            role: guest.role,
-          });
-        }
-      }
-
-      return { activity, guests };
-    });
+    if (!createdActivity) {
+      throw new BadRequestException('Não foi possível criar a atividade');
+    }
 
     return {
-      message: 'Atividade criada com sucesso.',
+      success: true,
       data: {
-        activity: {
-          ...this.mapActivity(result.activity),
-          guests: result.guests,
-        },
+        activity: createdActivity,
       },
     };
   }
 
   async findAll(query: FindAllActivitiesDto) {
-    const baseQuery = db.select().from(tabelaAtividade);
+    void query;
 
-    if (query.eventId) {
-      baseQuery.where(eq(tabelaAtividade.eventoId, query.eventId));
-    }
-
-    const activities = await baseQuery;
+    const activities = await db.select().from(tabelaAtividade);
 
     return {
-      message: 'Atividades listadas com sucesso.',
+      success: true,
+      data: activities,
+    };
+  }
+
+  async findParticipants(id: number): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      presenceStatus: 'pending' | 'confirmed';
+    }>;
+  }> {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const participants = await db
+      .select({
+        id: tabelaUsuario.id,
+        name: tabelaUsuario.nome,
+        email: tabelaUsuario.email,
+        role: tabelaParticipacoes.tipo,
+      })
+      .from(tabelaParticipacoesAtividades)
+      .innerJoin(
+        tabelaParticipacoes,
+        eq(
+          tabelaParticipacoes.id,
+          tabelaParticipacoesAtividades.participacaoId,
+        ),
+      )
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaUsuario.id, tabelaParticipacoes.usuarioId),
+      )
+      .where(eq(tabelaParticipacoesAtividades.atividadeId, id))
+      .orderBy(asc(tabelaUsuario.nome));
+
+    return {
+      success: true,
+      data: participants.map((participant) => ({
+        id: String(participant.id),
+        name: participant.name,
+        email: participant.email,
+        role: participant.role,
+        presenceStatus: 'pending',
+      })),
+    };
+  }
+
+  async findOne(id: number, userId?: number) {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    let isRegistered = false;
+
+    if (typeof userId === 'number') {
+      const participations = await db
+        .select()
+        .from(tabelaParticipacoes)
+        .where(
+          and(
+            eq(tabelaParticipacoes.usuarioId, userId),
+            eq(tabelaParticipacoes.eventoId, activity.eventoId),
+          ),
+        );
+
+      const participation = participations.at(0);
+
+      if (participation) {
+        const existingSubscriptions = await db
+          .select()
+          .from(tabelaParticipacoesAtividades)
+          .where(
+            and(
+              eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
+              eq(tabelaParticipacoesAtividades.atividadeId, id),
+            ),
+          );
+
+        isRegistered = existingSubscriptions.length > 0;
+      }
+    }
+
+    return {
+      success: true,
       data: {
-        activities: activities.map((a) => this.mapActivity(a)),
+        ...activity,
+        isRegistered,
       },
     };
   }
 
-  async findOne(id: number) {
-    const rows = await db
-      .select({
-        atividade: tabelaAtividade,
-        convidado: tabelaConvidado,
-        funcao: tabelaConvidadoAtividade.funcao,
-      })
+  async subscribe(id: number, userId: number) {
+    const activities = await db
+      .select()
       .from(tabelaAtividade)
-      .leftJoin(
-        tabelaConvidadoAtividade,
-        eq(tabelaConvidadoAtividade.atividadeId, tabelaAtividade.id),
-      )
-      .leftJoin(
-        tabelaConvidado,
-        eq(tabelaConvidado.id, tabelaConvidadoAtividade.convidadoId),
-      )
       .where(eq(tabelaAtividade.id, id));
 
-    if (!rows.length) {
-      throw new NotFoundException('Atividade não encontrada.');
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
     }
 
-    const atividadeBase = rows[0].atividade;
+    const participations = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, activity.eventoId),
+        ),
+      );
 
-    const guests = rows
-      .filter((row) => row.convidado !== null)
-      .map((row) => ({
-        id: row.convidado!.id,
-        name: row.convidado!.nome,
-        email: row.convidado!.email,
-        role: row.funcao!,
-      }));
+    let participationId: number;
+    const participation = participations.at(0);
+
+    if (!participation) {
+      const createdParticipations = await db
+        .insert(tabelaParticipacoes)
+        .values({
+          usuarioId: userId,
+          eventoId: activity.eventoId,
+          tipo: 'participante',
+        })
+        .returning();
+
+      const createdParticipation = createdParticipations.at(0);
+
+      if (!createdParticipation) {
+        throw new BadRequestException('Não foi possível criar a participação');
+      }
+
+      participationId = createdParticipation.id;
+    } else {
+      participationId = participation.id;
+    }
+
+    const existingSubscriptions = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participationId),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    if (existingSubscriptions.length > 0) {
+      throw new BadRequestException('Usuário já inscrito nesta atividade');
+    }
+
+    await db.insert(tabelaParticipacoesAtividades).values({
+      participacaoId: participationId,
+      atividadeId: id,
+    });
 
     return {
-      message: 'Atividade encontrada com sucesso.',
+      success: true,
       data: {
-        activity: {
-          ...this.mapActivity(atividadeBase),
-          guests,
-        },
+        activityId: id,
+        userId,
+        participationId,
+      },
+    };
+  }
+
+  async unsubscribe(id: number, userId: number) {
+    const activities = await db
+      .select()
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.id, id));
+
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
+    }
+
+    const participations = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, activity.eventoId),
+        ),
+      );
+
+    const participation = participations.at(0);
+
+    if (!participation) {
+      throw new NotFoundException(
+        'Participação não encontrada para este usuário',
+      );
+    }
+
+    const existingSubscriptions = await db
+      .select()
+      .from(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    if (existingSubscriptions.length === 0) {
+      throw new BadRequestException(
+        'Usuário não está inscrito nesta atividade',
+      );
+    }
+
+    const hasConfirmedPresence = existingSubscriptions.some(
+      (subscription) => subscription.presente === true,
+    );
+
+    if (hasConfirmedPresence) {
+      throw new BadRequestException(
+        'Não é possível cancelar a inscrição da atividade com presença confirmada',
+      );
+    }
+
+    await db
+      .delete(tabelaParticipacoesAtividades)
+      .where(
+        and(
+          eq(tabelaParticipacoesAtividades.participacaoId, participation.id),
+          eq(tabelaParticipacoesAtividades.atividadeId, id),
+        ),
+      );
+
+    return {
+      success: true,
+      data: {
+        activityId: id,
+        userId,
+        participationId: participation.id,
       },
     };
   }
@@ -152,117 +325,68 @@ export class ActivityService {
     dto: UpdateActivityDto;
     userId: number;
   }) {
-    const existing = await db
+    void userId;
+
+    const activities = await db
       .select()
       .from(tabelaAtividade)
-      .where(eq(tabelaAtividade.id, id))
-      .limit(1);
+      .where(eq(tabelaAtividade.id, id));
 
-    if (!existing.length) {
-      throw new NotFoundException('Atividade não encontrada.');
+    const currentActivity = activities.at(0);
+
+    if (!currentActivity) {
+      throw new NotFoundException('Atividade não encontrada');
     }
 
-    await assertEventOrganizer(userId, existing[0].eventoId);
+    const updatedActivities = await db
+      .update(tabelaAtividade)
+      .set({
+        nome: dto.name ?? currentActivity.nome,
+        descricao: dto.description ?? currentActivity.descricao,
+        localizacao: dto.location ?? currentActivity.localizacao,
+        categoria: dto.category ?? currentActivity.categoria,
+        cargaHoraria: dto.workload ?? currentActivity.cargaHoraria,
+        dataInicio: dto.startDate
+          ? new Date(dto.startDate)
+          : currentActivity.dataInicio,
+        dataFim: dto.endDate ? new Date(dto.endDate) : currentActivity.dataFim,
+      })
+      .where(eq(tabelaAtividade.id, id))
+      .returning();
 
-    const result = await db.transaction(async (tx) => {
-      const [updatedActivity] = await tx
-        .update(tabelaAtividade)
-        .set({
-          ...(dto.name && { nome: dto.name }),
-          ...(dto.description && { descricao: dto.description }),
-          ...(dto.location && { localizacao: dto.location }),
-          ...(dto.category && { categoria: dto.category }),
-          ...(dto.workload !== undefined && { cargaHoraria: dto.workload }),
-          ...(dto.startDate && { dataInicio: new Date(dto.startDate) }),
-          ...(dto.endDate && { dataFim: new Date(dto.endDate) }),
-        })
-        .where(eq(tabelaAtividade.id, id))
-        .returning();
+    const updatedActivity = updatedActivities.at(0);
 
-      const guests: GuestResult[] = [];
-
-      if (dto.guests !== undefined) {
-        await tx
-          .delete(tabelaConvidadoAtividade)
-          .where(eq(tabelaConvidadoAtividade.atividadeId, id));
-
-        if (dto.guests.length > 0) {
-          for (const guest of dto.guests) {
-            let [existingGuest] = await tx
-              .select()
-              .from(tabelaConvidado)
-              .where(eq(tabelaConvidado.email, guest.email));
-
-            if (!existingGuest) {
-              [existingGuest] = await tx
-                .insert(tabelaConvidado)
-                .values({ nome: guest.name, email: guest.email })
-                .returning();
-            }
-
-            await tx.insert(tabelaConvidadoAtividade).values({
-              convidadoId: existingGuest.id,
-              atividadeId: id,
-              funcao: guest.role,
-            });
-
-            guests.push({
-              id: existingGuest.id,
-              name: existingGuest.nome,
-              email: existingGuest.email,
-              role: guest.role,
-            });
-          }
-        }
-      }
-
-      return { updatedActivity, guests };
-    });
+    if (!updatedActivity) {
+      throw new BadRequestException('Não foi possível atualizar a atividade');
+    }
 
     return {
-      message: 'Atividade atualizada com sucesso.',
+      success: true,
       data: {
-        activity: {
-          ...this.mapActivity(result.updatedActivity),
-          guests: result.guests,
-        },
+        activity: updatedActivity,
       },
     };
   }
 
-  async remove({ id, userId }: { id: number; userId: number }) {
-    const existing = await db
+  async remove({ id }: { id: number; userId: number }) {
+    const activities = await db
       .select()
       .from(tabelaAtividade)
-      .where(eq(tabelaAtividade.id, id))
-      .limit(1);
+      .where(eq(tabelaAtividade.id, id));
 
-    if (!existing.length) {
-      throw new NotFoundException('Atividade não encontrada.');
+    const activity = activities.at(0);
+
+    if (!activity) {
+      throw new NotFoundException('Atividade não encontrada');
     }
-
-    await assertEventOrganizer(userId, existing[0].eventoId);
 
     await db.delete(tabelaAtividade).where(eq(tabelaAtividade.id, id));
 
     return {
-      message: 'Atividade removida com sucesso.',
-      data: { id },
-    };
-  }
-
-  private mapActivity(activity: typeof tabelaAtividade.$inferSelect) {
-    return {
-      id: activity.id,
-      name: activity.nome,
-      description: activity.descricao,
-      location: activity.localizacao,
-      category: activity.categoria,
-      workload: activity.cargaHoraria,
-      startDate: activity.dataInicio,
-      endDate: activity.dataFim,
-      status: activity.status,
-      eventId: activity.eventoId,
+      success: true,
+      data: {
+        activity,
+      },
     };
   }
 }
