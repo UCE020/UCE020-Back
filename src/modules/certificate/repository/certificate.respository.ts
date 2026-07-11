@@ -158,6 +158,9 @@ export class CertificateRepository {
         nome: tabelaAtividade.nome,
         cargaHoraria: tabelaAtividade.cargaHoraria,
         status: tabelaAtividade.status,
+        localizacao: tabelaAtividade.localizacao,
+        dataInicio: tabelaAtividade.dataInicio,
+        dataFim: tabelaAtividade.dataFim,
         eventoId: tabelaAtividade.eventoId,
         eventoNome: tabelaEvento.nome,
       })
@@ -211,6 +214,9 @@ export class CertificateRepository {
         nome: tabelaEvento.nome,
         cargaHoraria: tabelaEvento.cargaHoraria,
         status: tabelaEvento.status,
+        localizacao: tabelaEvento.localizacao,
+        dataInicio: tabelaEvento.dataInicio,
+        dataFim: tabelaEvento.dataFim,
       })
       .from(tabelaEvento)
       .where(eq(tabelaEvento.id, eventoId));

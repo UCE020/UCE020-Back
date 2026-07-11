@@ -9,6 +9,7 @@ import { CertificateRepository } from './repository/certificate.respository';
 import { CertificateFileStorageService } from './storage/certificate-file-storage.service';
 import { renderGuestCertificatePdf } from './pdf/guest-certificate.pdf';
 import { renderParticipantCertificatePdf } from './pdf/participant-certificate.pdf';
+import { formatDateRange } from './pdf/format-date-range';
 
 @Injectable()
 export class CertificateService {
@@ -121,6 +122,8 @@ export class CertificateService {
         eventName: atividade.eventoNome,
         activityName: atividade.nome,
         workloadHours: atividade.cargaHoraria,
+        location: atividade.localizacao,
+        eventDate: formatDateRange(atividade.dataInicio, atividade.dataFim),
         issueDate: cert.dataEmissao,
       });
       const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
@@ -207,6 +210,8 @@ export class CertificateService {
         role: this.mapRole(participacao.tipo),
         eventName: evento.nome,
         workloadHours: evento.cargaHoraria,
+        location: evento.localizacao,
+        eventDate: formatDateRange(evento.dataInicio, evento.dataFim),
         issueDate: cert.dataEmissao,
       });
       const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(
