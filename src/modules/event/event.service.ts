@@ -205,20 +205,20 @@ export class EventService {
       .where(eq(tabelaParticipacoes.eventoId, id));
 
     const atividadesFormatadas = evento.atividades.map((atividade) => ({
-      id:          atividade.id,
-      name:        atividade.nome,
+      id: atividade.id,
+      name: atividade.nome,
       description: atividade.descricao,
-      location:    atividade.localizacao,
-      category:    atividade.categoria,
-      workload:    atividade.cargaHoraria,
-      startDate:   atividade.dataInicio,
-      endDate:     atividade.dataFim,
-      eventId:     atividade.eventoId,
-      guests:      atividade.convidados.map((vinculo) => ({
-        id:    vinculo.convidado.id,
-        name:  vinculo.convidado.nome,
+      location: atividade.localizacao,
+      category: atividade.categoria,
+      workload: atividade.cargaHoraria,
+      startDate: atividade.dataInicio,
+      endDate: atividade.dataFim,
+      eventId: atividade.eventoId,
+      guests: atividade.convidados.map((vinculo) => ({
+        id: vinculo.convidado.id,
+        name: vinculo.convidado.nome,
         email: vinculo.convidado.email,
-        role:  vinculo.funcao,
+        role: vinculo.funcao,
       })),
     }));
 
@@ -226,7 +226,7 @@ export class EventService {
       message: 'Evento encontrado.',
       data: {
         ...evento,
-        atividades:     atividadesFormatadas,
+        atividades: atividadesFormatadas,
         totalInscritos,
       },
     };
@@ -250,7 +250,6 @@ export class EventService {
     }
 
     await assertEventOrganizer(userId, eventoExistente.id);
-    
 
     const { atividades, ...dadosEvento } = updateEventDto;
 
@@ -384,6 +383,14 @@ export class EventService {
       .set({ status: 'finalizada' })
       .where(eq(tabelaEvento.id, id))
       .returning();
+
+    // Finaliza em cascata as atividades do evento — hoje é a única forma de uma
+    // atividade chegar a 'finalizada', necessário para liberar a emissão de
+    // certificado de convidado (ver CertificateService.generateGuestCertificates).
+    await db
+      .update(tabelaAtividade)
+      .set({ status: 'finalizada' })
+      .where(eq(tabelaAtividade.eventoId, id));
 
     return {
       message: 'Evento finalizado com sucesso.',

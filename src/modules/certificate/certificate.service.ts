@@ -1,48 +1,291 @@
 // src/modules/certificate/certificate.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
 import { CertificateRepository } from './repository/certificate.respository';
+import { CertificateFileStorageService } from './storage/certificate-file-storage.service';
+import { renderGuestCertificatePdf } from './pdf/guest-certificate.pdf';
+import { renderParticipantCertificatePdf } from './pdf/participant-certificate.pdf';
 
 @Injectable()
 export class CertificateService {
-  constructor(private readonly repo: CertificateRepository) {}
+  constructor(
+    private readonly repo: CertificateRepository,
+    private readonly fileStorage: CertificateFileStorageService,
+  ) {}
 
-// certificate.service.ts
-async getCertificatesByEvent(eventoId: number, page: number, limit: number) {
-  const rows = await this.repo.findByEvent(eventoId, page, limit);
+  // certificate.service.ts
+  async getCertificatesByEvent(eventoId: number, page: number, limit: number) {
+    const rows = await this.repo.findByEvent(eventoId, page, limit);
 
-  if (!rows.length) {
-    throw new NotFoundException('Nenhum certificado encontrado para este evento');
+    if (!rows.length) {
+      throw new NotFoundException(
+        'Nenhum certificado encontrado para este evento',
+      );
+    }
+
+    return rows.map((row) => this.toCertificateDto(row));
   }
 
-  return rows.map(row => ({
-    id:               String(row.id),
-    title:            row.activityTitle,
-    participantName:  row.participantName,
-    participantEmail: row.participantEmail,
-    role:             this.mapRole(row.role),
-    hours:            row.activityHours ?? undefined,
-    issueDate:        row.dataEmissao.toISOString(),
-    imageUrl:         undefined,
-  }));
-}
+  async getCertificateById(rawId: string) {
+    const [kind, idPart] = rawId.split('-');
+    const certificateId = Number(idPart);
+
+    if ((kind !== 'guest' && kind !== 'user') || !Number.isInteger(certificateId)) {
+      throw new NotFoundException('Certificado não encontrado.');
+    }
+
+    const row =
+      kind === 'guest'
+        ? await this.repo.findGuestCertificateById(certificateId)
+        : await this.repo.findUserCertificateById(certificateId);
+
+    if (!row) {
+      throw new NotFoundException('Certificado não encontrado.');
+    }
+
+    return this.toCertificateDto(row);
+  }
 
   async getCertificateStatsByEvent(eventoId: number) {
-    const rows = await this.repo.countByRole(eventoId);
-    const counts = new Map(rows.map(row => [this.mapRole(row.role), row.count]));
+    const [rows, guestTotal] = await Promise.all([
+      this.repo.countByRole(eventoId),
+      this.repo.countGuestCertificatesByEvent(eventoId),
+    ]);
+    const counts = new Map(
+      rows.map((row) => [this.mapRole(row.role), row.count]),
+    );
+    // Convidados (palestrante/ministrante/moderador) não têm cards próprios na tela de
+    // certificados gerados hoje — todo convidado certificado entra no card "Palestrante".
+    counts.set('Palestrante', guestTotal);
 
-    return ['Ouvinte', 'Monitor', 'Organizador', 'Palestrante'].map(role => ({
+    return ['Ouvinte', 'Monitor', 'Organizador', 'Palestrante'].map((role) => ({
       role,
       count: counts.get(role) ?? 0,
     }));
   }
 
+  async generateGuestCertificates(atividadeId: number, userId: number) {
+    const atividade = await this.repo.findActivityForCertificate(atividadeId);
+    if (!atividade) {
+      throw new NotFoundException('Atividade não encontrada.');
+    }
+
+    await assertEventOrganizer(userId, atividade.eventoId);
+
+    if (atividade.status !== 'finalizada') {
+      throw new ForbiddenException(
+        'Só é possível emitir certificados de convidado após a atividade ser finalizada.',
+      );
+    }
+
+    const guests = await this.repo.findGuestsByActivity(atividadeId);
+    if (!guests.length) {
+      throw new NotFoundException(
+        'Nenhum convidado encontrado para esta atividade.',
+      );
+    }
+
+    const existing =
+      await this.repo.findExistingGuestCertificatesByActivity(atividadeId);
+    const existingByConvidadoId = new Map(
+      existing.map((cert) => [cert.convidadoId, cert]),
+    );
+    const pending = guests.filter(
+      (guest) => !existingByConvidadoId.has(guest.convidadoId),
+    );
+
+    const dataEmissao = new Date();
+    const created = await this.repo.insertGuestCertificates(
+      pending.map((guest) => ({
+        convidadoId: guest.convidadoId,
+        atividadeId,
+        dataEmissao,
+      })),
+    );
+    const createdByConvidadoId = new Map(
+      created.map((cert) => [cert.convidadoId, cert]),
+    );
+
+    for (const guest of pending) {
+      const cert = createdByConvidadoId.get(guest.convidadoId);
+      if (!cert) continue;
+
+      const pdf = await renderGuestCertificatePdf({
+        certificateId: cert.id,
+        guestName: guest.nome,
+        role: this.mapGuestRole(guest.funcao),
+        eventName: atividade.eventoNome,
+        activityName: atividade.nome,
+        workloadHours: atividade.cargaHoraria,
+        issueDate: cert.dataEmissao,
+      });
+      const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
+        cert.id,
+        pdf,
+      );
+      await this.repo.setGuestCertificateFile(cert.id, fileUrl);
+      cert.arquivoPdf = fileUrl;
+    }
+
+    return {
+      message: `${created.length} certificado(s) de convidado emitido(s).`,
+      data: {
+        issued: created.length,
+        alreadyIssued: existing.length,
+        certificates: guests.map((guest) => {
+          const cert =
+            createdByConvidadoId.get(guest.convidadoId) ??
+            existingByConvidadoId.get(guest.convidadoId)!;
+
+          return {
+            convidadoId: guest.convidadoId,
+            name: guest.nome,
+            email: guest.email,
+            role: this.mapGuestRole(guest.funcao),
+            alreadyIssued: existingByConvidadoId.has(guest.convidadoId),
+            issueDate: cert.dataEmissao.toISOString(),
+            fileUrl: cert.arquivoPdf ?? undefined,
+          };
+        }),
+      },
+    };
+  }
+
+  async generateParticipantCertificates(eventoId: number, userId: number) {
+    const evento = await this.repo.findEventForCertificate(eventoId);
+    if (!evento) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+
+    await assertEventOrganizer(userId, eventoId);
+
+    if (evento.status !== 'finalizada') {
+      throw new ForbiddenException(
+        'Só é possível emitir certificados após o evento ser finalizado.',
+      );
+    }
+
+    const participacoes = await this.repo.findParticipacoesByEvent(eventoId);
+    if (!participacoes.length) {
+      throw new NotFoundException(
+        'Nenhum participante encontrado para este evento.',
+      );
+    }
+
+    const existing =
+      await this.repo.findExistingUserCertificatesByEvent(eventoId);
+    const existingByUsuarioId = new Map(
+      existing.map((cert) => [cert.usuarioId, cert]),
+    );
+    const pending = participacoes.filter(
+      (participacao) => !existingByUsuarioId.has(participacao.usuarioId),
+    );
+
+    const dataEmissao = new Date();
+    const created = await this.repo.insertUserCertificates(
+      pending.map((participacao) => ({
+        usuarioId: participacao.usuarioId,
+        eventoId,
+        dataEmissao,
+      })),
+    );
+    const createdByUsuarioId = new Map(
+      created.map((cert) => [cert.usuarioId, cert]),
+    );
+
+    for (const participacao of pending) {
+      const cert = createdByUsuarioId.get(participacao.usuarioId);
+      if (!cert) continue;
+
+      const pdf = await renderParticipantCertificatePdf({
+        certificateId: cert.id,
+        participantName: participacao.nome,
+        role: this.mapRole(participacao.tipo),
+        eventName: evento.nome,
+        workloadHours: evento.cargaHoraria,
+        issueDate: cert.dataEmissao,
+      });
+      const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(
+        cert.id,
+        pdf,
+      );
+      await this.repo.setUserCertificateFile(cert.id, fileUrl);
+      cert.arquivoPdf = fileUrl;
+    }
+
+    return {
+      message: `${created.length} certificado(s) emitido(s).`,
+      data: {
+        issued: created.length,
+        alreadyIssued: existing.length,
+        certificates: participacoes.map((participacao) => {
+          const cert =
+            createdByUsuarioId.get(participacao.usuarioId) ??
+            existingByUsuarioId.get(participacao.usuarioId)!;
+
+          return {
+            usuarioId: participacao.usuarioId,
+            name: participacao.nome,
+            email: participacao.email,
+            role: this.mapRole(participacao.tipo),
+            alreadyIssued: existingByUsuarioId.has(participacao.usuarioId),
+            issueDate: cert.dataEmissao.toISOString(),
+            fileUrl: cert.arquivoPdf ?? undefined,
+          };
+        }),
+      },
+    };
+  }
+
+  private toCertificateDto(row: {
+    id: number;
+    dataEmissao: Date;
+    participantName: string;
+    participantEmail: string;
+    role: string;
+    activityTitle: string;
+    activityHours: number | null;
+    arquivoPdf: string | null;
+  }) {
+    const guest = this.isGuestRole(row.role);
+
+    return {
+      id: `${guest ? 'guest' : 'user'}-${row.id}`,
+      title: row.activityTitle,
+      participantName: row.participantName,
+      participantEmail: row.participantEmail,
+      role: guest ? this.mapGuestRole(row.role) : this.mapRole(row.role),
+      hours: row.activityHours ?? undefined,
+      issueDate: row.dataEmissao.toISOString(),
+      imageUrl: row.arquivoPdf ?? undefined,
+    };
+  }
+
+  private isGuestRole(role: string): boolean {
+    return ['palestrante', 'ministrante', 'moderador'].includes(
+      role.toLowerCase(),
+    );
+  }
+
   private mapRole(role: string): string {
     const map: Record<string, string> = {
       participante: 'Ouvinte',
-      monitor:      'Monitor',
-      organizador:  'Organizador',
-      palestrante:  'Palestrante',
+      monitor: 'Monitor',
+      organizador: 'Organizador',
     };
     return map[role.toLowerCase()] ?? role;
+  }
+
+  private mapGuestRole(funcao: string): string {
+    const map: Record<string, string> = {
+      palestrante: 'Palestrante',
+      ministrante: 'Ministrante',
+      moderador: 'Moderador',
+    };
+    return map[funcao.toLowerCase()] ?? funcao;
   }
 }
