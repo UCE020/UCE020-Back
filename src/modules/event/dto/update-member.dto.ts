@@ -19,5 +19,5 @@ export class UpdateMemberDto {
     message:
       'Tipo inválido. Deve ser um dos seguintes valores: participante, organizador, monitor.',
   })
-  tipo: TipoParticipante;
+  tipo!: TipoParticipante;
 }

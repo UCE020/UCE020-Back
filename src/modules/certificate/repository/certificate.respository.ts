@@ -163,6 +163,10 @@ export class CertificateRepository {
         dataFim: tabelaAtividade.dataFim,
         eventoId: tabelaAtividade.eventoId,
         eventoNome: tabelaEvento.nome,
+        assinante1Nome:   tabelaEvento.assinante1Nome,   
+        assinante1Titulo: tabelaEvento.assinante1Titulo, 
+        assinante2Nome:   tabelaEvento.assinante2Nome,   
+        assinante2Titulo: tabelaEvento.assinante2Titulo, 
       })
       .from(tabelaAtividade)
       .innerJoin(tabelaEvento, eq(tabelaAtividade.eventoId, tabelaEvento.id))
@@ -217,6 +221,10 @@ export class CertificateRepository {
         localizacao: tabelaEvento.localizacao,
         dataInicio: tabelaEvento.dataInicio,
         dataFim: tabelaEvento.dataFim,
+        assinante1Nome:   tabelaEvento.assinante1Nome,   
+        assinante1Titulo: tabelaEvento.assinante1Titulo, 
+        assinante2Nome:   tabelaEvento.assinante2Nome,   
+        assinante2Titulo: tabelaEvento.assinante2Titulo,
       })
       .from(tabelaEvento)
       .where(eq(tabelaEvento.id, eventoId));
