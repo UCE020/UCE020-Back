@@ -49,7 +49,9 @@ export class ActivityController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as atividades (com filtros opcionais)' })
+  @ApiOperation({
+    summary: 'Listar todas as atividades (com filtros opcionais)',
+  })
   @ApiResponse({ status: 200, description: 'Atividades listadas com sucesso.' })
   findAll(@Query() query: FindAllActivitiesDto) {
     return this.activityService.findAll(query);
@@ -77,7 +79,10 @@ export class ActivityController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar os detalhes de uma atividade pelo ID' })
-  @ApiResponse({ status: 200, description: 'Atividade encontrada com sucesso.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Atividade encontrada com sucesso.',
+  })
   @ApiResponse({ status: 404, description: 'Atividade não encontrada.' })
   findOne(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.activityService.findOne(+id, req.user.sub);
@@ -91,7 +96,9 @@ export class ActivityController {
   }
 
   @Delete(':id/unsubscribe')
-  @ApiOperation({ summary: 'Cancelar inscrição do usuário autenticado na atividade' })
+  @ApiOperation({
+    summary: 'Cancelar inscrição do usuário autenticado na atividade',
+  })
   @ApiResponse({ status: 200, description: 'Inscrição cancelada com sucesso.' })
   unsubscribe(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.activityService.unsubscribe(+id, req.user.sub);
@@ -99,7 +106,10 @@ export class ActivityController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar os dados de uma atividade' })
-  @ApiResponse({ status: 200, description: 'Atividade atualizada com sucesso.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Atividade atualizada com sucesso.',
+  })
   @ApiResponse({
     status: 403,
     description: 'Apenas organizadores podem realizar esta ação.',

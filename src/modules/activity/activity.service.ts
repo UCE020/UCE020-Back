@@ -287,6 +287,16 @@ export class ActivityService {
       );
     }
 
+    const hasConfirmedPresence = existingSubscriptions.some(
+      (subscription) => subscription.presente === true,
+    );
+
+    if (hasConfirmedPresence) {
+      throw new BadRequestException(
+        'Não é possível cancelar a inscrição da atividade com presença confirmada',
+      );
+    }
+
     await db
       .delete(tabelaParticipacoesAtividades)
       .where(
