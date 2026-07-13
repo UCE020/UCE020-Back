@@ -257,8 +257,8 @@ export const certificateStyles = StyleSheet.create({
     lineHeight: 1.5,
   },
 
-  // Seção fixa de Realização (logo UEFS)
-  realizacaoSection: {
+  // Seção fixa de Apoio (logo UEFS)
+  apoioSection: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,7 +268,7 @@ export const certificateStyles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  realizacaoLabel: {
+  apoioLabel: {
     fontSize: 8,
     fontWeight: 700,
     color: '#94A3B8',
@@ -276,7 +276,7 @@ export const certificateStyles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  realizacaoLogo: {
+  apoioLogo: {
     width: 90,
     height: 32,
     objectFit: 'contain',
