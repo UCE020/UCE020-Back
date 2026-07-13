@@ -167,8 +167,9 @@ export class EventController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async remove(@Param('id') id: string) {
-    return await this.eventService.remove(+id);
+  async remove(@Param('id') id: string, @User() user: JwtPayload) {
+    const userId = Number(user.sub);
+    return await this.eventService.remove(+id, userId);
   }
 
   // --- Rotas de Gerenciamento de Membros ---
