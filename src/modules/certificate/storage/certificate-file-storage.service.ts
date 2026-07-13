@@ -1,14 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
-
-const CERTIFICATES_DIR = join(process.cwd(), 'uploads', 'certificates');
-
-const PUBLIC_BASE_URL =
-  process.env.PUBLIC_BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+import { SupabaseStorageService } from 'src/common/storage/supabase-storage.service';
 
 @Injectable()
 export class CertificateFileStorageService {
+  constructor(private readonly storage: SupabaseStorageService) {}
   
   private sanitizeFilename(text: string): string {
     return text.replace(/[/\\?%*:|"<>]/g, '').trim();
@@ -43,9 +38,15 @@ export class CertificateFileStorageService {
   }
 
   private async save(filename: string, pdf: Buffer): Promise<string> {
-    await mkdir(CERTIFICATES_DIR, { recursive: true });
-    await writeFile(join(CERTIFICATES_DIR, filename), pdf);
+    return this.storage.uploadBuffer({
+      folder: 'Outros',
+      buffer: pdf,
+      originalName: filename,
+      contentType: 'application/pdf',
+    });
+  }
 
-    return `${PUBLIC_BASE_URL}/uploads/certificates/${encodeURIComponent(filename)}`;
+  async remove(fileUrl?: string | null): Promise<void> {
+    await this.storage.tryRemoveByPublicUrl(fileUrl);
   }
 }

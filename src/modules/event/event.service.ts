@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
@@ -16,12 +17,30 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { ActivityService } from '../activity/activity.service';
 import { assertEventOrganizer } from 'src/common/helpers/assert-event-organizer.helper';
+import { SupabaseStorageService } from 'src/common/storage/supabase-storage.service';
 
 export type TipoParticipante = 'participante' | 'organizador' | 'monitor';
 
 @Injectable()
 export class EventService {
-  constructor(private readonly activityService: ActivityService) {}
+  constructor(
+    private readonly activityService: ActivityService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
+
+  async assertAuthenticatedUserExists(userId: number): Promise<void> {
+    const [user] = await db
+      .select({ id: tabelaUsuario.id })
+      .from(tabelaUsuario)
+      .where(eq(tabelaUsuario.id, userId))
+      .limit(1);
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Usuario autenticado nao existe no banco. Faca login novamente.',
+      );
+    }
+  }
 
   private async gerarCodigoUnico(nome: string): Promise<string> {
     const prefixo = nome
@@ -48,32 +67,58 @@ export class EventService {
     return `${prefixo}${Date.now().toString().slice(-4)}`;
   }
 
+  private async prepareActivityPhoto(
+    foto: string | undefined,
+    ownerId: number | string,
+  ): Promise<{ foto?: string; uploadedUrl?: string }> {
+    if (!foto?.startsWith('data:')) {
+      return { foto };
+    }
+
+    const uploadedUrl = await this.storage.uploadDataUrl(
+      'Atividades',
+      foto,
+      ownerId,
+    );
+
+    return { foto: uploadedUrl, uploadedUrl };
+  }
+
   async create(createEventDto: CreateEventDto, userId: number) {
+    await this.assertAuthenticatedUserExists(userId);
+
     const codigo =
       createEventDto.codigo?.trim() ||
       (await this.gerarCodigoUnico(createEventDto.nome));
 
-    const [novoEvento] = await db
-      .insert(tabelaEvento)
-      .values({
-        nome: createEventDto.nome,
-        codigo,
-        descricao: createEventDto.descricao,
-        localizacao: createEventDto.localizacao,
-        responsavel: createEventDto.responsavel,
-        cargaHoraria: createEventDto.cargaHoraria,
-        dataInicio: createEventDto.dataInicio,
-        dataFim: createEventDto.dataFim,
-        status: createEventDto.status,
-        foto: createEventDto.foto,
-      })
-      .returning();
+    const novoEvento = await db.transaction(async (tx) => {
+      const [evento] = await tx
+        .insert(tabelaEvento)
+        .values({
+          nome: createEventDto.nome,
+          codigo,
+          descricao: createEventDto.descricao,
+          localizacao: createEventDto.localizacao,
+          responsavel: createEventDto.responsavel,
+          cargaHoraria: createEventDto.cargaHoraria,
+          dataInicio: createEventDto.dataInicio,
+          dataFim: createEventDto.dataFim,
+          status: createEventDto.status,
+          foto: createEventDto.foto,
+        })
+        .returning();
 
-    // Registra o criador como organizador do evento
-    await db.insert(tabelaParticipacoes).values({
-      usuarioId: userId,
-      eventoId: novoEvento.id,
-      tipo: 'organizador',
+      if (!evento) {
+        throw new BadRequestException('Nao foi possivel criar o evento.');
+      }
+
+      await tx.insert(tabelaParticipacoes).values({
+        usuarioId: userId,
+        eventoId: evento.id,
+        tipo: 'organizador',
+      });
+
+      return evento;
     });
 
     const atividadesCriadas: any[] = [];
@@ -81,7 +126,15 @@ export class EventService {
 
     if (createEventDto.atividades?.length) {
       for (const atividadeDto of createEventDto.atividades) {
+        let uploadedActivityPhotoUrl: string | undefined;
+
         try {
+          const preparedPhoto = await this.prepareActivityPhoto(
+            atividadeDto.foto,
+            novoEvento.id,
+          );
+          uploadedActivityPhotoUrl = preparedPhoto.uploadedUrl;
+
           const resultado = await this.activityService.create({
             dto: {
               eventId: novoEvento.id,
@@ -92,6 +145,7 @@ export class EventService {
               workload: atividadeDto.workload,
               startDate: atividadeDto.startDate,
               endDate: atividadeDto.endDate,
+              foto: preparedPhoto.foto,
               guests: atividadeDto.guests,
             },
             userId,
@@ -99,6 +153,10 @@ export class EventService {
 
           atividadesCriadas.push(resultado.data.activity);
         } catch (error) {
+          if (uploadedActivityPhotoUrl) {
+            await this.storage.tryRemoveByPublicUrl(uploadedActivityPhotoUrl);
+          }
+
           atividadesComErro.push({
             input: atividadeDto,
             error: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -259,6 +317,14 @@ export class EventService {
       .where(eq(tabelaEvento.id, id))
       .returning();
 
+    if (
+      dadosEvento.foto &&
+      eventoExistente.foto &&
+      dadosEvento.foto !== eventoExistente.foto
+    ) {
+      await this.storage.tryRemoveByPublicUrl(eventoExistente.foto);
+    }
+
     const atividadesAtualizadas: any[] = [];
     const atividadesComErro: { input: any; error: string }[] = [];
 
@@ -289,7 +355,15 @@ export class EventService {
       }
 
       for (const atividadeDto of atividades) {
+        let uploadedActivityPhotoUrl: string | undefined;
+
         try {
+          const preparedPhoto = await this.prepareActivityPhoto(
+            atividadeDto.foto,
+            atividadeDto.id ?? id,
+          );
+          uploadedActivityPhotoUrl = preparedPhoto.uploadedUrl;
+
           if (atividadeDto.id) {
             const resultado = await this.activityService.update({
               id: atividadeDto.id,
@@ -303,6 +377,7 @@ export class EventService {
                 endDate: atividadeDto.endDate,
                 guests: atividadeDto.guests,
                 eventId: atividadeDto.eventId,
+                foto: preparedPhoto.foto,
               },
               userId,
             });
@@ -318,6 +393,7 @@ export class EventService {
                 workload: atividadeDto.workload,
                 startDate: atividadeDto.startDate,
                 endDate: atividadeDto.endDate,
+                foto: preparedPhoto.foto,
                 guests: atividadeDto.guests,
               },
               userId,
@@ -325,6 +401,10 @@ export class EventService {
             atividadesAtualizadas.push(resultado.data.activity);
           }
         } catch (error) {
+          if (uploadedActivityPhotoUrl) {
+            await this.storage.tryRemoveByPublicUrl(uploadedActivityPhotoUrl);
+          }
+
           atividadesComErro.push({
             input: atividadeDto,
             error: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -417,7 +497,19 @@ export class EventService {
       );
     }
 
+    const activityPhotos = await db
+      .select({ foto: tabelaAtividade.foto })
+      .from(tabelaAtividade)
+      .where(eq(tabelaAtividade.eventoId, id));
+
     await db.delete(tabelaEvento).where(eq(tabelaEvento.id, id));
+
+    await this.storage.tryRemoveByPublicUrl(eventoExistente.foto);
+    await Promise.all(
+      activityPhotos.map((activity) =>
+        this.storage.tryRemoveByPublicUrl(activity.foto),
+      ),
+    );
 
     return {
       message: 'Evento removido com sucesso.',

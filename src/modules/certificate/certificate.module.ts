@@ -8,9 +8,10 @@ import { CertificateService } from './certificate.service';
 import { AuthModule } from '../auth/auth.module';
 import { CertificateRepository } from './repository/certificate.respository';
 import { CertificateFileStorageService } from './storage/certificate-file-storage.service';
+import { SupabaseStorageModule } from 'src/common/storage/supabase-storage.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SupabaseStorageModule],
   controllers: [
     CertificateController,
     CertificateGuestController,
