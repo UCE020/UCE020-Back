@@ -17,8 +17,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/common/types/request-with-user.type';
-import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
-import { CertificateService } from './certificate.service';
+import { CertificateService } from '../certificate.service';
+import { JwtAuthGuard } from 'src/modules/auth/jwt/jwt-auth.guard';
 
 @ApiTags('certificate')
 @ApiBearerAuth()

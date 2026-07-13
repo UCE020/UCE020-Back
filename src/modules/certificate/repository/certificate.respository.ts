@@ -23,6 +23,7 @@ export class CertificateRepository {
         participantName: tabelaUsuario.nome,
         participantEmail: tabelaUsuario.email,
         role: tabelaParticipacoes.tipo,
+        location: tabelaEvento.localizacao,
         activityTitle: tabelaEvento.nome,
         activityHours: tabelaEvento.cargaHoraria,
         arquivoPdf: tabelaCertificadoEvento.arquivoPdf,
@@ -54,6 +55,7 @@ export class CertificateRepository {
         participantName: tabelaConvidado.nome,
         participantEmail: tabelaConvidado.email,
         role: tabelaConvidadoAtividade.funcao,
+        location: tabelaAtividade.localizacao,
         activityTitle: tabelaAtividade.nome,
         activityHours: tabelaAtividade.cargaHoraria,
         arquivoPdf: tabelaCertificadoConvidado.arquivoPdf,
@@ -91,6 +93,17 @@ export class CertificateRepository {
 
     const offset = (page - 1) * limit;
     return [...userRows, ...guestRows]
+      .sort((a, b) => b.dataEmissao.getTime() - a.dataEmissao.getTime())
+      .slice(offset, offset + limit);
+  }
+
+  async findByUser(usuarioId: number, page: number, limit: number) {
+    const rows = await this.userCertificateQuery(
+      eq(tabelaCertificadoEvento.usuarioId, usuarioId),
+    );
+
+    const offset = (page - 1) * limit;
+    return rows
       .sort((a, b) => b.dataEmissao.getTime() - a.dataEmissao.getTime())
       .slice(offset, offset + limit);
   }
