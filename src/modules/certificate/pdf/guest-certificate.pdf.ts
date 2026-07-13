@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { Document, Page, Text, View, pdf } from '@react-pdf/renderer';
-import { streamToBuffer } from './stream-to-buffer';
+import { Document, Page, Text, View, Image, pdf } from '@react-pdf/renderer';
+import { streamToBuffer }       from './stream-to-buffer';
 import { certificateStyles as styles } from './certificate.styles';
+import { LOGO_ASSINAE_SRC, LOGO_UEFS_SRC } from 'src/resources/certificatesConfig/certificate.assets';
 
 export type GuestCertificateData = {
   certificateId:     number;
@@ -20,9 +21,9 @@ export type GuestCertificateData = {
 };
 
 const GUEST_CERT_TITLE: Record<string, string> = {
-  Palestrante: 'Certificado de Palestrante',
-  Ministrante: 'Certificado de Ministrante',
-  Moderador:   'Certificado de Moderador',
+  Palestrante: 'CERTIFICADO DE PALESTRANTE',
+  Ministrante: 'CERTIFICADO DE MINISTRANTE',
+  Moderador:   'CERTIFICADO DE MODERADOR',
 };
 
 const GUEST_ROLE_VERB: Record<string, string> = {
@@ -33,22 +34,29 @@ const GUEST_ROLE_VERB: Record<string, string> = {
 
 function buildDocument(data: GuestCertificateData) {
   const e = React.createElement;
-  const certTitle = GUEST_CERT_TITLE[data.role] ?? 'Certificado de Participação';
+  const certTitle = GUEST_CERT_TITLE[data.role] ?? 'CERTIFICADO DE PARTICIPAÇÃO';
   const roleVerb  = GUEST_ROLE_VERB[data.role]  ?? 'participou da atividade';
 
   return e(Document, {},
     e(Page, { size: 'A4', orientation: 'landscape', style: styles.page },
 
       e(View, { style: styles.outerBorder }),
-      e(View, { style: styles.innerBorder }),
+      e(View, { style: styles.cornerTL }),
+      e(View, { style: styles.cornerTR }),
+      e(View, { style: styles.cornerBL }),
+      e(View, { style: styles.cornerBR }),
 
       e(View, { style: styles.content },
 
-        // Topo
-        e(View, { style: styles.topSection },
+        // Logo
+        e(View, { style: styles.headerSection },
+          e(Image, { src: LOGO_ASSINAE_SRC, style: styles.logo }),
+        ),
+
+        // Tipo + nome do evento
+        e(View, { style: styles.certTypeSection },
           e(Text, { style: styles.certTypeLabel }, certTitle),
-          e(Text, { style: styles.eventName }, data.eventName.toUpperCase()),
-          e(View, { style: styles.topDivider }),
+          e(Text, { style: styles.eventName },     data.eventName),
         ),
 
         // Corpo
@@ -61,9 +69,7 @@ function buildDocument(data: GuestCertificateData) {
             e(Text, { style: styles.descriptionBold }, `"${data.activityName}"`),
             ', parte do evento ',
             e(Text, { style: styles.descriptionBold }, `"${data.eventName}"`),
-            data.workloadHours
-              ? `, com carga horária de `
-              : '.',
+            data.workloadHours ? ', com carga horária de ' : '.',
           ),
           ...(data.workloadHours ? [
             e(Text, { style: styles.descriptionText },
@@ -73,9 +79,22 @@ function buildDocument(data: GuestCertificateData) {
           ] : []),
 
           e(View, { style: styles.detailsRow },
-            e(Text, { style: styles.detailText }, data.location),
-            e(Text, { style: styles.detailDot }, '•'),
-            e(Text, { style: styles.detailText }, data.eventDate),
+            e(View, { style: styles.detailBlock },
+              e(Text, { style: styles.detailLabel }, 'Local'),
+              e(Text, { style: styles.detailValue }, data.location),
+            ),
+            e(View, { style: styles.detailSeparator }),
+            e(View, { style: styles.detailBlock },
+              e(Text, { style: styles.detailLabel }, 'Período'),
+              e(Text, { style: styles.detailValue }, data.eventDate),
+            ),
+            ...(data.workloadHours ? [
+              e(View, { style: styles.detailSeparator }),
+              e(View, { style: styles.detailBlock },
+                e(Text, { style: styles.detailLabel }, 'Carga Horária'),
+                e(Text, { style: styles.detailValue }, `${data.workloadHours}h`),
+              ),
+            ] : []),
           ),
         ),
 
@@ -101,15 +120,17 @@ function buildDocument(data: GuestCertificateData) {
           ),
         ),
 
+        // Realização (fixa) — logo UEFS
+        e(View, { style: styles.realizacaoSection },
+          e(Text, { style: styles.realizacaoLabel }, 'Realização:'),
+          e(Image, { src: LOGO_UEFS_SRC, style: styles.realizacaoLogo }),
+        ),
+
         // Rodapé
         e(View, { style: styles.footerSection },
-          e(Text, { style: styles.footerText },
-            `Emitido em ${data.issueDate.toLocaleDateString('pt-BR')}`,
-          ),
-          e(Text, { style: styles.footerBrand }, 'ASSINAÊ'),
-          e(Text, { style: styles.footerText },
-            `Certificado nº ${data.certificateId}`,
-          ),
+          e(Text, { style: styles.footerLeft }, `Emitido em ${data.issueDate.toLocaleDateString('pt-BR')}`),
+          e(Text, { style: styles.footerCenter }, 'Universidade Estadual de Feira de Santana — UEFS'),
+          e(Text, { style: styles.footerRight }, `Certificado nº ${data.certificateId}`),
         ),
       ),
     ),

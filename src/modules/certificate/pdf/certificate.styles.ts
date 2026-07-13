@@ -1,76 +1,143 @@
 import { StyleSheet } from '@react-pdf/renderer';
+import { Font }       from '@react-pdf/renderer';
+import { join }       from 'path';
+
+Font.register({
+  family: 'Poppins',
+  fonts: [
+    {
+      src: join(process.cwd(), 'src', 'resources', 'fonts', 'Poppins-Regular.ttf'),
+      fontWeight: 400,
+    },
+    {
+      src: join(process.cwd(), 'src', 'resources', 'fonts', 'Poppins-Bold.ttf'),
+      fontWeight: 700,
+    },
+    {
+      src: join(process.cwd(), 'src', 'resources', 'fonts', 'Poppins-Italic.ttf'),
+      fontWeight: 400,
+      fontStyle: 'italic'
+    },
+  ],
+});
 
 export const certificateStyles = StyleSheet.create({
+
   page: {
     padding: 0,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Poppins',
     backgroundColor: '#ffffff',
   },
 
-  // Borda externa decorativa
+  // Borda externa com cantos decorativos — linha verde
   outerBorder: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    bottom: 16,
+    top: 18,
+    left: 18,
+    right: 18,
+    bottom: 18,
     borderWidth: 2,
-    borderColor: '#0F1D35',
+    borderColor: '#2EC4A0',
+    borderStyle: 'solid',
   },
 
-  // Borda interna decorativa
-  innerBorder: {
+  // Canto superior esquerdo
+  cornerTL: {
     position: 'absolute',
-    top: 22,
-    left: 22,
-    right: 22,
-    bottom: 22,
-    borderWidth: 0.5,
-    borderColor: '#2EC4A0',
+    top: 10,
+    left: 10,
+    width: 24,
+    height: 24,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopColor: '#0F1D35',
+    borderLeftColor: '#0F1D35',
+  },
+  // Canto superior direito
+  cornerTR: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 24,
+    height: 24,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopColor: '#0F1D35',
+    borderRightColor: '#0F1D35',
+  },
+  // Canto inferior esquerdo
+  cornerBL: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomColor: '#0F1D35',
+    borderLeftColor: '#0F1D35',
+  },
+  // Canto inferior direito
+  cornerBR: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomColor: '#0F1D35',
+    borderRightColor: '#0F1D35',
   },
 
   // Container principal
   content: {
     flexGrow: 1,
     paddingHorizontal: 64,
-    paddingVertical: 36,
+    paddingTop: 32,
+    paddingBottom: 28,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
 
-  // Topo
-  topSection: {
+  // Header — logo
+  headerSection: {
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 4,
+  },
+
+  logo: {
+    width: 140,
+    height: 56,
+    objectFit: 'contain',
+  },
+
+  // Tipo do certificado + nome do evento
+  certTypeSection: {
     alignItems: 'center',
     width: '100%',
   },
 
   certTypeLabel: {
-    fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
-    color: '#2EC4A0',
+    fontSize: 10,
+    fontWeight: 700,
+    color: '#0F1D35',
     letterSpacing: 3,
     textTransform: 'uppercase',
     textAlign: 'center',
-    marginBottom: 6,
-  },
-
-  eventName: {
-    fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
-    color: '#0F1D35',
-    textAlign: 'center',
-    letterSpacing: 1,
-    lineHeight: 1.3,
     marginBottom: 4,
   },
 
-  topDivider: {
-    width: '60%',
-    height: 1,
-    backgroundColor: '#2EC4A0',
-    marginTop: 12,
+  eventName: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#2EC4A0',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    lineHeight: 1.3,
   },
 
   // Corpo central
@@ -81,64 +148,83 @@ export const certificateStyles = StyleSheet.create({
 
   certificamosQue: {
     fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
+    fontWeight: 400,
     color: '#64748B',
-    letterSpacing: 4,
+    letterSpacing: 3,
     textTransform: 'uppercase',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   participantName: {
-    fontSize: 36,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: 28,
+    fontWeight: 700,
     color: '#0F1D35',
     textAlign: 'center',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 16,
+    marginBottom: 12,
     lineHeight: 1.2,
   },
 
   descriptionText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: 400,
     color: '#475467',
     textAlign: 'center',
     lineHeight: 1.8,
-    maxWidth: 480,
+    maxWidth: 500,
   },
 
   descriptionBold: {
-    fontFamily: 'Helvetica-Bold',
+    fontWeight: 700,
     color: '#0F1D35',
   },
 
+  // Linha de detalhes — local, período, carga horária
   detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     marginTop: 10,
+    gap: 8,
   },
 
-  detailText: {
+  detailBlock: {
+    alignItems: 'center',
+  },
+
+  detailLabel: {
+    fontSize: 7,
+    fontWeight: 700,
+    color: '#94A3B8',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+
+  detailValue: {
     fontSize: 10,
-    color: '#64748B',
+    fontWeight: 700,
+    color: '#0F1D35',
     textAlign: 'center',
   },
 
-  detailDot: {
-    fontSize: 10,
-    color: '#2EC4A0',
+  detailSeparator: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 8,
   },
 
   // Assinaturas
   signaturesSection: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    paddingHorizontal: 40,
+    marginTop: 40, 
   },
 
   signatureBlock: {
@@ -150,46 +236,85 @@ export const certificateStyles = StyleSheet.create({
     width: 180,
     height: 1,
     backgroundColor: '#0F1D35',
-    marginBottom: 8,
+    marginBottom: 10, 
   },
 
   signatureNameSpace: {
     fontSize: 9,
+    fontWeight: 400,
     color: '#94A3B8',
-    fontFamily: 'Helvetica',
     textAlign: 'center',
-    marginBottom: 4,
     fontStyle: 'italic',
+    marginBottom: 3,
+    lineHeight: 1.4,
   },
 
   signatureTitle: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: 8,
+    fontWeight: 700,
     color: '#0F1D35',
     textAlign: 'center',
     lineHeight: 1.5,
+  },
+
+  // Seção fixa de Realização (logo UEFS)
+  realizacaoSection: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+
+  realizacaoLabel: {
+    fontSize: 8,
+    fontWeight: 700,
+    color: '#94A3B8',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+
+  realizacaoLogo: {
+    width: 90,
+    height: 32,
+    objectFit: 'contain',
   },
 
   // Rodapé
   footerSection: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 0.5,
     borderTopColor: '#E2E8F0',
   },
 
-  footerText: {
+  footerLeft: {
+    flex: 1,
+    textAlign: 'left',
     fontSize: 8,
+    fontWeight: 400,
     color: '#94A3B8',
   },
 
-  footerBrand: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: '#2EC4A0',
-    letterSpacing: 1.5,
+  footerCenter: {
+    flex: 1.5,
+    textAlign: 'center',
+    fontSize: 8,
+    fontWeight: 400,
+    color: '#94A3B8',
+  },
+
+  footerRight: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 8,
+    fontWeight: 400,
+    color: '#CBD5E1',
   },
 });

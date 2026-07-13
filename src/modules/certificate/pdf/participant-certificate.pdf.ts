@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { Document, Page, Text, View, pdf } from '@react-pdf/renderer';
-import { streamToBuffer } from './stream-to-buffer';
+import { Document, Page, Text, View, Image, pdf } from '@react-pdf/renderer';
+import { streamToBuffer }       from './stream-to-buffer';
 import { certificateStyles as styles } from './certificate.styles';
+import { LOGO_ASSINAE_SRC, LOGO_UEFS_SRC } from 'src/resources/certificatesConfig/certificate.assets';
 
 export type ParticipantCertificateData = {
   certificateId:     number;
@@ -19,40 +20,48 @@ export type ParticipantCertificateData = {
 };
 
 const ROLE_CERT_TITLE: Record<string, string> = {
-  Ouvinte:     'Certificado de Participação',
-  Monitor:     'Certificado de Monitoria',
-  Organizador: 'Certificado de Organização',
+  Ouvinte:     'CERTIFICADO DE PARTICIPAÇÃO',
+  Monitor:     'CERTIFICADO DE MONITORIA',
+  Organizador: 'CERTIFICADO DE ORGANIZAÇÃO',
+};
+
+const ROLE_VERB: Record<string, string> = {
+  Ouvinte:     'participou do evento',
+  Monitor:     'atuou como monitor no evento',
+  Organizador: 'atuou como organizador do evento',
 };
 
 function buildDocument(data: ParticipantCertificateData) {
   const e = React.createElement;
-  const certTitle = ROLE_CERT_TITLE[data.role] ?? 'Certificado de Participação';
-
-  const roleDescriptions: Record<string, string> = {
-    Ouvinte:     'participou do evento',
-    Monitor:     'atuou como monitor no evento',
-    Organizador: 'atuou como organizador do evento',
-  };
-  const roleVerb = roleDescriptions[data.role] ?? 'participou do evento';
+  const certTitle = ROLE_CERT_TITLE[data.role] ?? 'CERTIFICADO DE PARTICIPAÇÃO';
+  const roleVerb  = ROLE_VERB[data.role]       ?? 'participou do evento';
 
   return e(Document, {},
     e(Page, { size: 'A4', orientation: 'landscape', style: styles.page },
 
-      // Bordas decorativas
+      // Borda verde
       e(View, { style: styles.outerBorder }),
-      e(View, { style: styles.innerBorder }),
 
-      // Conteúdo
+      // Cantos decorativos em azul escuro
+      e(View, { style: styles.cornerTL }),
+      e(View, { style: styles.cornerTR }),
+      e(View, { style: styles.cornerBL }),
+      e(View, { style: styles.cornerBR }),
+
       e(View, { style: styles.content },
 
-        // Topo — tipo do certificado + nome do evento
-        e(View, { style: styles.topSection },
-          e(Text, { style: styles.certTypeLabel }, certTitle),
-          e(Text, { style: styles.eventName }, data.eventName.toUpperCase()),
-          e(View, { style: styles.topDivider }),
+        // Logo
+        e(View, { style: styles.headerSection },
+          e(Image, { src: LOGO_ASSINAE_SRC, style: styles.logo }),
         ),
 
-        // Corpo — nome do participante
+        // Tipo + nome do evento
+        e(View, { style: styles.certTypeSection },
+          e(Text, { style: styles.certTypeLabel }, certTitle),
+          e(Text, { style: styles.eventName },     data.eventName),
+        ),
+
+        // Corpo
         e(View, { style: styles.bodySection },
           e(Text, { style: styles.certificamosQue }, 'Certificamos que'),
           e(Text, { style: styles.participantName }, data.participantName),
@@ -61,7 +70,7 @@ function buildDocument(data: ParticipantCertificateData) {
             `${roleVerb} `,
             e(Text, { style: styles.descriptionBold }, `"${data.eventName}"`),
             data.workloadHours
-              ? `, desempenhando uma carga horária de `
+              ? ', com carga horária de '
               : '.',
           ),
           ...(data.workloadHours ? [
@@ -71,17 +80,29 @@ function buildDocument(data: ParticipantCertificateData) {
             ),
           ] : []),
 
-          // Local e período
+          // Detalhes
           e(View, { style: styles.detailsRow },
-            e(Text, { style: styles.detailText }, data.location),
-            e(Text, { style: styles.detailDot }, '•'),
-            e(Text, { style: styles.detailText }, data.eventDate),
+            e(View, { style: styles.detailBlock },
+              e(Text, { style: styles.detailLabel }, 'Local'),
+              e(Text, { style: styles.detailValue }, data.location),
+            ),
+            e(View, { style: styles.detailSeparator }),
+            e(View, { style: styles.detailBlock },
+              e(Text, { style: styles.detailLabel }, 'Período'),
+              e(Text, { style: styles.detailValue }, data.eventDate),
+            ),
+            ...(data.workloadHours ? [
+              e(View, { style: styles.detailSeparator }),
+              e(View, { style: styles.detailBlock },
+                e(Text, { style: styles.detailLabel }, 'Carga Horária'),
+                e(Text, { style: styles.detailValue }, `${data.workloadHours}h`),
+              ),
+            ] : []),
           ),
         ),
 
         // Assinaturas
         e(View, { style: styles.signaturesSection },
-          // Assinante 1
           e(View, { style: styles.signatureBlock },
             e(View, { style: styles.signatureLine }),
             e(Text, { style: styles.signatureNameSpace },
@@ -91,7 +112,6 @@ function buildDocument(data: ParticipantCertificateData) {
               data.assinante1Titulo ?? ' ',
             ),
           ),
-          // Assinante 2
           e(View, { style: styles.signatureBlock },
             e(View, { style: styles.signatureLine }),
             e(Text, { style: styles.signatureNameSpace },
@@ -103,15 +123,17 @@ function buildDocument(data: ParticipantCertificateData) {
           ),
         ),
 
-        // Rodapé
+        // Realização (fixa) — logo UEFS
+        e(View, { style: styles.realizacaoSection },
+          e(Text, { style: styles.realizacaoLabel }, 'Realização:'),
+          e(Image, { src: LOGO_UEFS_SRC, style: styles.realizacaoLogo }),
+        ),
+
+        // Rodapé (Atualizado com as novas classes de simetria)
         e(View, { style: styles.footerSection },
-          e(Text, { style: styles.footerText },
-            `Emitido em ${data.issueDate.toLocaleDateString('pt-BR')}`,
-          ),
-          e(Text, { style: styles.footerBrand }, 'ASSINAÊ'),
-          e(Text, { style: styles.footerText },
-            `Certificado nº ${data.certificateId}`,
-          ),
+          e(Text, { style: styles.footerLeft }, `Emitido em ${data.issueDate.toLocaleDateString('pt-BR')}`),
+          e(Text, { style: styles.footerCenter }, 'Universidade Estadual de Feira de Santana — UEFS'),
+          e(Text, { style: styles.footerRight }, `Certificado nº ${data.certificateId}`),
         ),
       ),
     ),

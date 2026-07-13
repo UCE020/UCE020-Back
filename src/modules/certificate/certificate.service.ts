@@ -132,6 +132,8 @@ export class CertificateService {
       });
       const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
         cert.id,
+        guest.nome,
+        atividade.nome,
         pdf,
       );
       await this.repo.setGuestCertificateFile(cert.id, fileUrl);
@@ -224,6 +226,8 @@ export class CertificateService {
       });
       const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(
         cert.id,
+        evento.nome,
+        participacao.nome,
         pdf,
       );
       await this.repo.setUserCertificateFile(cert.id, fileUrl);
