@@ -10,6 +10,7 @@ import {
   tabelaConvidado,
   tabelaConvidadoAtividade,
   tabelaEvento,
+  tabelaParticipacoesAtividades,
 } from 'src/db/schema';
 import { and, eq, sql, SQL } from 'drizzle-orm';
 
@@ -257,7 +258,22 @@ export class CertificateRepository {
         tabelaUsuario,
         eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
       )
-      .where(eq(tabelaParticipacoes.eventoId, eventoId));
+      .innerJoin(
+        tabelaParticipacoesAtividades,
+        eq(tabelaParticipacoes.id, tabelaParticipacoesAtividades.participacaoId),
+      )
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventoId),
+          eq(tabelaParticipacoesAtividades.presente, true), 
+        )
+      )
+      .groupBy(
+        tabelaUsuario.id,
+        tabelaUsuario.nome,
+        tabelaUsuario.email,
+        tabelaParticipacoes.tipo,
+      );
   }
 
   async findExistingUserCertificatesByEvent(eventoId: number) {
