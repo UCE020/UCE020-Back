@@ -10,6 +10,7 @@ import {
   tabelaConvidado,
   tabelaConvidadoAtividade,
   tabelaEvento,
+  tabelaParticipacoesAtividades,
 } from 'src/db/schema';
 import { and, eq, sql, SQL } from 'drizzle-orm';
 
@@ -23,6 +24,7 @@ export class CertificateRepository {
         participantName: tabelaUsuario.nome,
         participantEmail: tabelaUsuario.email,
         role: tabelaParticipacoes.tipo,
+        location: tabelaEvento.localizacao,
         activityTitle: tabelaEvento.nome,
         activityHours: tabelaEvento.cargaHoraria,
         arquivoPdf: tabelaCertificadoEvento.arquivoPdf,
@@ -54,6 +56,7 @@ export class CertificateRepository {
         participantName: tabelaConvidado.nome,
         participantEmail: tabelaConvidado.email,
         role: tabelaConvidadoAtividade.funcao,
+        location: tabelaAtividade.localizacao,
         activityTitle: tabelaAtividade.nome,
         activityHours: tabelaAtividade.cargaHoraria,
         arquivoPdf: tabelaCertificadoConvidado.arquivoPdf,
@@ -91,6 +94,17 @@ export class CertificateRepository {
 
     const offset = (page - 1) * limit;
     return [...userRows, ...guestRows]
+      .sort((a, b) => b.dataEmissao.getTime() - a.dataEmissao.getTime())
+      .slice(offset, offset + limit);
+  }
+
+  async findByUser(usuarioId: number, page: number, limit: number) {
+    const rows = await this.userCertificateQuery(
+      eq(tabelaCertificadoEvento.usuarioId, usuarioId),
+    );
+
+    const offset = (page - 1) * limit;
+    return rows
       .sort((a, b) => b.dataEmissao.getTime() - a.dataEmissao.getTime())
       .slice(offset, offset + limit);
   }
@@ -244,7 +258,22 @@ export class CertificateRepository {
         tabelaUsuario,
         eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
       )
-      .where(eq(tabelaParticipacoes.eventoId, eventoId));
+      .innerJoin(
+        tabelaParticipacoesAtividades,
+        eq(tabelaParticipacoes.id, tabelaParticipacoesAtividades.participacaoId),
+      )
+      .where(
+        and(
+          eq(tabelaParticipacoes.eventoId, eventoId),
+          eq(tabelaParticipacoesAtividades.presente, true), 
+        )
+      )
+      .groupBy(
+        tabelaUsuario.id,
+        tabelaUsuario.nome,
+        tabelaUsuario.email,
+        tabelaParticipacoes.tipo,
+      );
   }
 
   async findExistingUserCertificatesByEvent(eventoId: number) {

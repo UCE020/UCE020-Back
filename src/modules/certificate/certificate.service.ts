@@ -298,12 +298,18 @@ export class CertificateService {
     };
   }
 
+  async getCertificatesByUser(usuarioId: number, page: number, limit: number) {
+    const rows = await this.repo.findByUser(usuarioId, page, limit);
+    return rows.map((row) => this.toCertificateDto(row));
+  }
+
   private toCertificateDto(row: {
     id: number;
     dataEmissao: Date;
     participantName: string;
     participantEmail: string;
     role: string;
+    location: string;
     activityTitle: string;
     activityHours: number | null;
     arquivoPdf: string | null;
@@ -317,6 +323,7 @@ export class CertificateService {
       participantEmail: row.participantEmail,
       role: guest ? this.mapGuestRole(row.role) : this.mapRole(row.role),
       hours: row.activityHours ?? undefined,
+      location: row.location,
       issueDate: row.dataEmissao.toISOString(),
       imageUrl: row.arquivoPdf ?? undefined,
     };
