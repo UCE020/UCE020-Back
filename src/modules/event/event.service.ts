@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   tabelaEvento,
@@ -197,6 +197,13 @@ export class EventService {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
     }
 
+    const [{ totalInscritos }] = await db
+      .select({
+        totalInscritos: sql<number>`count(${tabelaParticipacoes.id})::int`,
+      })
+      .from(tabelaParticipacoes)
+      .where(eq(tabelaParticipacoes.eventoId, id));
+
     const atividadesFormatadas = evento.atividades.map((atividade) => ({
       id: atividade.id,
       name: atividade.nome,
@@ -220,6 +227,7 @@ export class EventService {
       data: {
         ...evento,
         atividades: atividadesFormatadas,
+        totalInscritos,
       },
     };
   }
@@ -233,6 +241,12 @@ export class EventService {
 
     if (!eventoExistente) {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    if (eventoExistente.status === 'finalizada') {
+      throw new BadRequestException(
+        'Não é possível editar um evento já finalizado.',
+      );
     }
 
     await assertEventOrganizer(userId, eventoExistente.id);
@@ -329,6 +343,58 @@ export class EventService {
         atividades: atividadesAtualizadas,
         ...(atividadesComErro.length > 0 && { atividadesComErro }),
       },
+    };
+  }
+
+  async finalizar(id: number, userId: number) {
+    const [eventoExistente] = await db
+      .select()
+      .from(tabelaEvento)
+      .where(eq(tabelaEvento.id, id))
+      .limit(1);
+
+    if (!eventoExistente) {
+      throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    const [participacao] = await db
+      .select()
+      .from(tabelaParticipacoes)
+      .where(
+        and(
+          eq(tabelaParticipacoes.usuarioId, userId),
+          eq(tabelaParticipacoes.eventoId, id),
+        ),
+      )
+      .limit(1);
+
+    if (!participacao || participacao.tipo !== 'organizador') {
+      throw new ForbiddenException(
+        'Apenas o organizador do evento pode finalizá-lo.',
+      );
+    }
+
+    if (eventoExistente.status === 'finalizada') {
+      throw new BadRequestException('Evento já está finalizado.');
+    }
+
+    const [eventoAtualizado] = await db
+      .update(tabelaEvento)
+      .set({ status: 'finalizada' })
+      .where(eq(tabelaEvento.id, id))
+      .returning();
+
+    // Finaliza em cascata as atividades do evento — hoje é a única forma de uma
+    // atividade chegar a 'finalizada', necessário para liberar a emissão de
+    // certificado de convidado (ver CertificateService.generateGuestCertificates).
+    await db
+      .update(tabelaAtividade)
+      .set({ status: 'finalizada' })
+      .where(eq(tabelaAtividade.eventoId, id));
+
+    return {
+      message: 'Evento finalizado com sucesso.',
+      data: eventoAtualizado,
     };
   }
 

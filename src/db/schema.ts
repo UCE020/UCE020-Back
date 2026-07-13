@@ -71,6 +71,10 @@ export const tabelaEvento = pgTable('evento', {
   dataFim: timestamp('dataFim').notNull(),
   status: statusEnum('status').notNull(),
   foto: text('foto'), //url
+  assinante1Nome:       text('assinante1_nome'),     
+  assinante1Titulo:     text('assinante1_titulo'),     
+  assinante2Nome:       text('assinante2_nome'),        
+  assinante2Titulo:     text('assinante2_titulo'), 
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
@@ -164,6 +168,19 @@ export const tabelaCertificadoAtividade = pgTable('certificado_atividade', {
   arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
 });
 
+//Tabela de certificado dos convidados (palestrante/ministrante/moderador de uma atividade)
+export const tabelaCertificadoConvidado = pgTable('certificado_convidado', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  convidadoId: integer('convidado_id')
+    .notNull()
+    .references(() => tabelaConvidado.id, { onDelete: 'cascade' }),
+  atividadeId: integer('atividade_id')
+    .notNull()
+    .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
+  dataEmissao: timestamp('dataEmissao').notNull(),
+  arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
+});
+
 //Relações
 
 //Relacionamento de usuário
@@ -197,6 +214,8 @@ export const tabelaAtividadeRelations = relations(
     convidados: many(tabelaConvidadoAtividade),
     //Uma atividade tem muitos participantes
     participacoes: many(tabelaParticipacoesAtividades),
+    //Uma atividade tem muitos certificados de convidado
+    certificadosConvidado: many(tabelaCertificadoConvidado),
   }),
 );
 
@@ -250,6 +269,7 @@ export const tabelaConvidadoRelations = relations(
   tabelaConvidado,
   ({ many }) => ({
     atividades: many(tabelaConvidadoAtividade),
+    certificados: many(tabelaCertificadoConvidado),
   }),
 );
 
@@ -297,6 +317,23 @@ export const tabelaCertificadoAtividadeRelations = relations(
     //Um certificado pertence a uma atividade
     atividade: one(tabelaAtividade, {
       fields: [tabelaCertificadoAtividade.atividadeId],
+      references: [tabelaAtividade.id],
+    }),
+  }),
+);
+
+//Relacionamento de certificado convidado
+export const tabelaCertificadoConvidadoRelations = relations(
+  tabelaCertificadoConvidado,
+  ({ one }) => ({
+    //Um certificado pertence a um convidado
+    convidado: one(tabelaConvidado, {
+      fields: [tabelaCertificadoConvidado.convidadoId],
+      references: [tabelaConvidado.id],
+    }),
+    //Um certificado pertence a uma atividade
+    atividade: one(tabelaAtividade, {
+      fields: [tabelaCertificadoConvidado.atividadeId],
       references: [tabelaAtividade.id],
     }),
   }),

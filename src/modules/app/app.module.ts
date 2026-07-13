@@ -31,8 +31,12 @@ import { join } from 'path';
     EmailModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads', 'avatars'),
-      
+
       serveRoot: '/uploads/avatars',
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads', 'certificates'),
+      serveRoot: '/uploads/certificates',
     }),
   ],
   controllers: [AppController],
