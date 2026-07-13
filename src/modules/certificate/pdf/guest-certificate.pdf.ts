@@ -120,10 +120,10 @@ function buildDocument(data: GuestCertificateData) {
           ),
         ),
 
-        // Realização (fixa) — logo UEFS
-        e(View, { style: styles.realizacaoSection },
-          e(Text, { style: styles.realizacaoLabel }, 'Realização:'),
-          e(Image, { src: LOGO_UEFS_SRC, style: styles.realizacaoLogo }),
+        // Apoio (fixa) — logo UEFS
+        e(View, { style: styles.apoioSection },
+          e(Text, { style: styles.apoioLabel }, 'Apoio:'),
+          e(Image, { src: LOGO_UEFS_SRC, style: styles.apoioLogo }),
         ),
 
         // Rodapé
