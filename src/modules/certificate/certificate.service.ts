@@ -69,7 +69,11 @@ export class CertificateService {
     }));
   }
 
-  async generateGuestCertificates(atividadeId: number, userId: number) {
+  async generateGuestCertificates(
+    atividadeId: number,
+    userId: number,
+    force = false,
+  ) {
     const atividade = await this.repo.findActivityForCertificate(atividadeId);
     if (!atividade) {
       throw new NotFoundException('Atividade não encontrada.');
@@ -111,8 +115,12 @@ export class CertificateService {
       created.map((cert) => [cert.convidadoId, cert]),
     );
 
-    for (const guest of pending) {
-      const cert = createdByConvidadoId.get(guest.convidadoId);
+    const toRender = force ? guests : pending;
+
+    for (const guest of toRender) {
+      const cert =
+        createdByConvidadoId.get(guest.convidadoId) ??
+        existingByConvidadoId.get(guest.convidadoId);
       if (!cert) continue;
 
       const pdf = await renderGuestCertificatePdf({
@@ -125,9 +133,9 @@ export class CertificateService {
         location: atividade.localizacao,
         eventDate: formatDateRange(atividade.dataInicio, atividade.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   atividade.assinante1Nome ?? undefined,   
-        assinante1Titulo: atividade.assinante1Titulo ?? undefined, 
-        assinante2Nome:   atividade.assinante2Nome ?? undefined,   
+        assinante1Nome:   atividade.assinante1Nome ?? undefined,
+        assinante1Titulo: atividade.assinante1Titulo ?? undefined,
+        assinante2Nome:   atividade.assinante2Nome ?? undefined,
         assinante2Titulo: atividade.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
@@ -137,13 +145,19 @@ export class CertificateService {
         pdf,
       );
       await this.repo.setGuestCertificateFile(cert.id, fileUrl);
+      if (force && existingByConvidadoId.has(guest.convidadoId)) {
+        await this.repo.resetGuestCertificateSignature(cert.id);
+      }
       cert.arquivoPdf = fileUrl;
     }
 
     return {
-      message: `${created.length} certificado(s) de convidado emitido(s).`,
+      message: force
+        ? `${toRender.length} certificado(s) de convidado (re)emitido(s).`
+        : `${created.length} certificado(s) de convidado emitido(s).`,
       data: {
         issued: created.length,
+        regenerated: force ? existing.length : 0,
         alreadyIssued: existing.length,
         certificates: guests.map((guest) => {
           const cert =
@@ -164,7 +178,11 @@ export class CertificateService {
     };
   }
 
-  async generateParticipantCertificates(eventoId: number, userId: number) {
+  async generateParticipantCertificates(
+    eventoId: number,
+    userId: number,
+    force = false,
+  ) {
     const evento = await this.repo.findEventForCertificate(eventoId);
     if (!evento) {
       throw new NotFoundException('Evento não encontrado.');
@@ -206,8 +224,14 @@ export class CertificateService {
       created.map((cert) => [cert.usuarioId, cert]),
     );
 
-    for (const participacao of pending) {
-      const cert = createdByUsuarioId.get(participacao.usuarioId);
+    // Sem force: só os novos. Com force: regera todos (novo layout) e
+    // invalida a assinatura anterior dos que já existiam.
+    const toRender = force ? participacoes : pending;
+
+    for (const participacao of toRender) {
+      const cert =
+        createdByUsuarioId.get(participacao.usuarioId) ??
+        existingByUsuarioId.get(participacao.usuarioId);
       if (!cert) continue;
 
       const pdf = await renderParticipantCertificatePdf({
@@ -219,9 +243,9 @@ export class CertificateService {
         location: evento.localizacao,
         eventDate: formatDateRange(evento.dataInicio, evento.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   evento.assinante1Nome ?? undefined,   
-        assinante1Titulo: evento.assinante1Titulo ?? undefined, 
-        assinante2Nome:   evento.assinante2Nome ?? undefined,   
+        assinante1Nome:   evento.assinante1Nome ?? undefined,
+        assinante1Titulo: evento.assinante1Titulo ?? undefined,
+        assinante2Nome:   evento.assinante2Nome ?? undefined,
         assinante2Titulo: evento.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(
@@ -231,13 +255,19 @@ export class CertificateService {
         pdf,
       );
       await this.repo.setUserCertificateFile(cert.id, fileUrl);
+      if (force && existingByUsuarioId.has(participacao.usuarioId)) {
+        await this.repo.resetUserCertificateSignature(cert.id);
+      }
       cert.arquivoPdf = fileUrl;
     }
 
     return {
-      message: `${created.length} certificado(s) emitido(s).`,
+      message: force
+        ? `${toRender.length} certificado(s) (re)emitido(s).`
+        : `${created.length} certificado(s) emitido(s).`,
       data: {
         issued: created.length,
+        regenerated: force ? existing.length : 0,
         alreadyIssued: existing.length,
         certificates: participacoes.map((participacao) => {
           const cert =

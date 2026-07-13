@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, writeFile, readFile } from 'fs/promises';
+import { join, basename } from 'path';
 
 const CERTIFICATES_DIR = join(process.cwd(), 'uploads', 'certificates');
 
@@ -9,7 +9,6 @@ const PUBLIC_BASE_URL =
 
 @Injectable()
 export class CertificateFileStorageService {
-  
   private sanitizeFilename(text: string): string {
     return text.replace(/[/\\?%*:|"<>]/g, '').trim();
   }
@@ -24,7 +23,7 @@ export class CertificateFileStorageService {
     const safeEvent = this.sanitizeFilename(eventName);
 
     const filename = `Certificado ${safeName} - ${safeEvent} - ${certificateId}.pdf`;
-    
+
     return this.save(filename, pdf);
   }
 
@@ -38,7 +37,7 @@ export class CertificateFileStorageService {
     const safeEvent = this.sanitizeFilename(eventName);
 
     const filename = `Certificado Convidado ${safeName} - ${safeEvent} - ${certificateId}.pdf`;
-    
+
     return this.save(filename, pdf);
   }
 
@@ -47,5 +46,24 @@ export class CertificateFileStorageService {
     await writeFile(join(CERTIFICATES_DIR, filename), pdf);
 
     return `${PUBLIC_BASE_URL}/uploads/certificates/${encodeURIComponent(filename)}`;
+  }
+
+  /** Resolve o caminho local a partir da URL pública salva em `arquivoPdf`. */
+  private resolveLocalPath(fileUrl: string): string {
+    // Pega só o nome do arquivo (o restante da URL é ignorado) e decodifica.
+    const encodedName = fileUrl.split('/').pop() ?? '';
+    const filename = basename(decodeURIComponent(encodedName));
+    return join(CERTIFICATES_DIR, filename);
+  }
+
+  /** Lê o PDF já salvo em disco a partir da URL pública. */
+  async readCertificatePdf(fileUrl: string): Promise<Buffer> {
+    return readFile(this.resolveLocalPath(fileUrl));
+  }
+
+  /** Sobrescreve o PDF existente (mesma URL) com a versão assinada. */
+  async overwriteCertificatePdf(fileUrl: string, pdf: Buffer): Promise<void> {
+    await mkdir(CERTIFICATES_DIR, { recursive: true });
+    await writeFile(this.resolveLocalPath(fileUrl), pdf);
   }
 }

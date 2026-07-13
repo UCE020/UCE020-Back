@@ -153,6 +153,15 @@ export const tabelaCertificadoEvento = pgTable('certificado_evento', {
     .references(() => tabelaEvento.id, { onDelete: 'cascade' }),
   dataEmissao: timestamp('dataEmissao').notNull(),
   arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
+  // --- Assinatura digital (lógica + carimbo/hash) ---
+  assinado: boolean('assinado').notNull().default(false),
+  assinadoEm: timestamp('assinado_em'),
+  assinadoPor: integer('assinado_por').references(() => tabelaUsuario.id, {
+    onDelete: 'set null',
+  }),
+  assinaturaNome: text('assinatura_nome'), //nome do assinante estampado no PDF
+  codigoVerificacao: text('codigo_verificacao'), //código público usado na verificação
+  hashVerificacao: text('hash_verificacao'), //hash de integridade do documento assinado
 });
 
 //Tabela de certificado dos participantes
@@ -166,6 +175,15 @@ export const tabelaCertificadoAtividade = pgTable('certificado_atividade', {
     .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
   dataEmissao: timestamp('dataEmissao').notNull(),
   arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
+  // --- Assinatura digital (lógica + carimbo/hash) ---
+  assinado: boolean('assinado').notNull().default(false),
+  assinadoEm: timestamp('assinado_em'),
+  assinadoPor: integer('assinado_por').references(() => tabelaUsuario.id, {
+    onDelete: 'set null',
+  }),
+  assinaturaNome: text('assinatura_nome'),
+  codigoVerificacao: text('codigo_verificacao'),
+  hashVerificacao: text('hash_verificacao'),
 });
 
 //Tabela de certificado dos convidados (palestrante/ministrante/moderador de uma atividade)
@@ -179,6 +197,15 @@ export const tabelaCertificadoConvidado = pgTable('certificado_convidado', {
     .references(() => tabelaAtividade.id, { onDelete: 'cascade' }),
   dataEmissao: timestamp('dataEmissao').notNull(),
   arquivoPdf: text('arquivo_pdf'), //url do arquivo PDF gerado
+  // --- Assinatura digital (lógica + carimbo/hash) ---
+  assinado: boolean('assinado').notNull().default(false),
+  assinadoEm: timestamp('assinado_em'),
+  assinadoPor: integer('assinado_por').references(() => tabelaUsuario.id, {
+    onDelete: 'set null',
+  }),
+  assinaturaNome: text('assinatura_nome'),
+  codigoVerificacao: text('codigo_verificacao'),
+  hashVerificacao: text('hash_verificacao'),
 });
 
 //Relações

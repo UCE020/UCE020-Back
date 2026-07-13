@@ -1,4 +1,4 @@
-// src/modules/certificate/certificate-guest.controller.ts
+// src/modules/certificate/signature/certificate-signature.controller.ts
 import {
   Controller,
   Post,
@@ -20,30 +20,29 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/common/types/request-with-user.type';
-import { CertificateService } from '../certificate.service';
 import { JwtAuthGuard } from 'src/modules/auth/jwt/jwt-auth.guard';
+import { CertificateSignatureService } from './certificate-signature.service';
 
 @ApiTags('certificate')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('activity/:atividadeId/certificate/guests')
-export class CertificateGuestController {
-  constructor(private readonly certificateService: CertificateService) {}
+@Controller('event/:eventoId/certificate')
+export class CertificateSignatureController {
+  constructor(
+    private readonly signatureService: CertificateSignatureService,
+  ) {}
 
-  @Post()
+  @Post('sign')
   @ApiOperation({
     summary:
-      'Emitir certificado dos convidados (palestrante/ministrante/moderador) de uma atividade',
+      'Assinar em lote todos os certificados do evento (participantes, atividades e convidados)',
   })
-  @ApiOkResponse({
-    description: 'Certificados de convidado emitidos com sucesso.',
-  })
+  @ApiOkResponse({ description: 'Certificados assinados com sucesso.' })
   @ApiNotFoundResponse({
-    description: 'Atividade não encontrada ou sem convidados.',
+    description: 'Nenhum certificado pendente de assinatura.',
   })
   @ApiForbiddenResponse({
-    description:
-      'Apenas organizadores podem emitir certificados, e apenas de atividades finalizadas.',
+    description: 'Apenas organizadores podem assinar certificados.',
   })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
   @ApiQuery({
@@ -51,15 +50,15 @@ export class CertificateGuestController {
     required: false,
     type: Boolean,
     description:
-      'Se true, regera o PDF dos certificados já existentes (novo layout) e invalida a assinatura anterior.',
+      'Se true, reassina também os certificados já assinados (regera o PDF).',
   })
-  generateGuestCertificates(
-    @Param('atividadeId', ParseIntPipe) atividadeId: number,
+  signEventCertificates(
+    @Param('eventoId', ParseIntPipe) eventoId: number,
     @Req() req: RequestWithUser,
     @Query('force', new ParseBoolPipe({ optional: true })) force = false,
   ) {
-    return this.certificateService.generateGuestCertificates(
-      atividadeId,
+    return this.signatureService.signEventCertificates(
+      eventoId,
       req.user.sub,
       force,
     );
