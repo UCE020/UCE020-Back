@@ -11,6 +11,8 @@ import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from 'src/config/env.validation';
 import { ActivityModule } from '../activity/activity.module';
 import databaseConfig from '../../config/database.config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -27,6 +29,15 @@ import databaseConfig from '../../config/database.config';
     ParticipationModule,
     CertificateModule,
     EmailModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads', 'avatars'),
+
+      serveRoot: '/uploads/avatars',
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads', 'certificates'),
+      serveRoot: '/uploads/certificates',
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -3,6 +3,18 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "resources/certificatesConfig/assets/**/*",
+        "outDir": "dist/src",
+        "watchAssets": true
+      },
+      { 
+        "include": "**/*.ttf", 
+        "outDir": "dist/src",
+        "watchAssets": true
+      }
+    ]
   }
 }

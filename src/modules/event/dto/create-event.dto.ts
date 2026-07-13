@@ -49,4 +49,21 @@ export class CreateEventDto {
   @Type(() => Array)
   @IsOptional()
   atividades?: CreateActivityDto[];
+
+  // Dados de assinatura do certificado
+  @IsString()
+  @IsOptional()
+  assinante1Nome?: string;
+
+  @IsString()
+  @IsOptional()
+  assinante1Titulo?: string;
+
+  @IsString()
+  @IsOptional()
+  assinante2Nome?: string;
+
+  @IsString()
+  @IsOptional()
+  assinante2Titulo?: string;
 }

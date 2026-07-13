@@ -123,6 +123,7 @@ export class EventController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Atualizar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento atualizado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Evento já está finalizado' })
   @ApiResponse({ status: 404, description: 'Evento não encontrado' })
   @ApiResponse({
     status: 401,
@@ -137,6 +138,25 @@ export class EventController {
     return await this.eventService.update(+id, updateEventDto, userId);
   }
 
+  @Patch(':id/finalizar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Finalizar evento pelo ID' })
+  @ApiResponse({ status: 200, description: 'Evento finalizado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Evento já está finalizado' })
+  @ApiResponse({ status: 404, description: 'Evento não encontrado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Token de autenticação inválido ou ausente',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Usuário não é organizador do evento',
+  })
+  async finalizar(@Param('id') id: string, @User() user: JwtPayload) {
+    return await this.eventService.finalizar(+id, Number(user.sub));
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -147,8 +167,9 @@ export class EventController {
     status: 401,
     description: 'Token de autenticação inválido ou ausente',
   })
-  async remove(@Param('id') id: string) {
-    return await this.eventService.remove(+id);
+  async remove(@Param('id') id: string, @User() user: JwtPayload) {
+    const userId = Number(user.sub);
+    return await this.eventService.remove(+id, userId);
   }
 
   // --- Rotas de Gerenciamento de Membros ---

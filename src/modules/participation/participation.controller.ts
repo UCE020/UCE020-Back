@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Get,
+  Body,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -20,6 +21,7 @@ import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import { User } from 'src/common/decorators/usuario.decorator';
 import type { JwtPayload } from 'src/common/types/jwt-payload.type';
 import { ParticipationService } from './participation.service';
+import { MarkActivityAttendanceDto } from './dto/mark-activity-attendance.dto';
 
 @ApiTags('participation')
 @ApiBearerAuth()
@@ -117,5 +119,94 @@ export class ParticipationController {
       //userId: user.sub,
       tipo: data,
     };
+  }
+
+  @Post('activity/:atividadeId/attendance')
+  @ApiOkResponse({
+    description: 'Presença marcada com sucesso',
+    schema: {
+      example: {
+        message: 'Presença marcada com sucesso',
+        data: {
+          eventoId: 10,
+          atividadeId: 3,
+          userId: 1,
+          participacaoId: 5,
+          presente: true,
+          dataPresenca: '2026-07-06T23:10:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Atividade não pertence ao evento' })
+  @ApiConflictResponse({ description: 'Presença já marcada' })
+  @ApiNotFoundResponse({
+    description: 'Evento, atividade ou inscrição não encontrada',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
+  async markActivityAttendance(
+    @User() user: JwtPayload,
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+    @Param('atividadeId', ParseIntPipe) atividadeId: number,
+    @Body() markAttendanceDto: MarkActivityAttendanceDto,
+  ) {
+    return await this.participationService.markActivityAttendance(
+      user.sub,
+      eventoId,
+      atividadeId,
+      markAttendanceDto.userId,
+    );
+  }
+
+  @Delete('activity/:atividadeId/attendance')
+  @ApiOkResponse({
+    description: 'Presença removida com sucesso',
+  })
+  @ApiBadRequestResponse({ description: 'Atividade não pertence ao evento' })
+  @ApiNotFoundResponse({
+    description: 'Evento, atividade ou inscrição não encontrada',
+  })
+  async removeActivityAttendance(
+    @User() user: JwtPayload,
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+    @Param('atividadeId', ParseIntPipe) atividadeId: number,
+    @Body() markAttendanceDto: MarkActivityAttendanceDto,
+  ) {
+    return await this.participationService.removeActivityAttendance(
+      user.sub,
+      eventoId,
+      atividadeId,
+      markAttendanceDto.userId,
+    );
+  }
+
+  @Get('activity/:atividadeId/participants')
+  @ApiOkResponse({
+    description: 'Lista de participantes inscritos na atividade',
+  })
+  @ApiNotFoundResponse({ description: 'Evento ou atividade não encontrada' })
+  async listActivityParticipants(
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+    @Param('atividadeId', ParseIntPipe) atividadeId: number,
+  ) {
+    return await this.participationService.listActivityParticipants(
+      eventoId,
+      atividadeId,
+    );
+  }
+
+  @Get('activity/:atividadeId/context')
+  @ApiOkResponse({
+    description: 'Contexto do evento e atividade para a validação de presença',
+  })
+  @ApiNotFoundResponse({ description: 'Evento ou atividade não encontrada' })
+  async getAttendanceContext(
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+    @Param('atividadeId', ParseIntPipe) atividadeId: number,
+  ) {
+    return await this.participationService.getAttendanceContext(
+      eventoId,
+      atividadeId,
+    );
   }
 }
