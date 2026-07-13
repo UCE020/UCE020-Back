@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
@@ -235,13 +236,12 @@ export class EventService {
     }
 
     await assertEventOrganizer(userId, eventoExistente.id);
-    
 
     const { atividades, ...dadosEvento } = updateEventDto;
 
     const [eventoAtualizado] = await db
       .update(tabelaEvento)
-      .set(dadosEvento)
+      .set(dadosEvento as Partial<typeof tabelaEvento.$inferInsert>)
       .where(eq(tabelaEvento.id, id))
       .returning();
 
@@ -332,7 +332,7 @@ export class EventService {
     };
   }
 
-  async remove(id: number) {
+  async remove(id: number, userId: number) {
     const [eventoExistente] = await db
       .select()
       .from(tabelaEvento)
@@ -341,6 +341,14 @@ export class EventService {
 
     if (!eventoExistente) {
       throw new NotFoundException(`Evento com ID ${id} não encontrado.`);
+    }
+
+    await assertEventOrganizer(userId, eventoExistente.id);
+
+    if (eventoExistente.status !== 'pendente') {
+      throw new BadRequestException(
+        'Apenas eventos com status "pendente" podem ser deletados.',
+      );
     }
 
     await db.delete(tabelaEvento).where(eq(tabelaEvento.id, id));
