@@ -133,9 +133,9 @@ export class CertificateService {
         location: atividade.localizacao,
         eventDate: formatDateRange(atividade.dataInicio, atividade.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   atividade.assinante1Nome ?? undefined,   
-        assinante1Titulo: atividade.assinante1Titulo ?? undefined, 
-        assinante2Nome:   atividade.assinante2Nome ?? undefined,   
+        assinante1Nome:   atividade.assinante1Nome ?? undefined,
+        assinante1Titulo: atividade.assinante1Titulo ?? undefined,
+        assinante2Nome:   atividade.assinante2Nome ?? undefined,
         assinante2Titulo: atividade.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
@@ -247,9 +247,9 @@ export class CertificateService {
         location: evento.localizacao,
         eventDate: formatDateRange(evento.dataInicio, evento.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   evento.assinante1Nome ?? undefined,   
-        assinante1Titulo: evento.assinante1Titulo ?? undefined, 
-        assinante2Nome:   evento.assinante2Nome ?? undefined,   
+        assinante1Nome:   evento.assinante1Nome ?? undefined,
+        assinante1Titulo: evento.assinante1Titulo ?? undefined,
+        assinante2Nome:   evento.assinante2Nome ?? undefined,
         assinante2Titulo: evento.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { db } from 'src/db';
 import {
   tabelaCertificadoEvento,
+  tabelaCertificadoAtividade,
   tabelaCertificadoConvidado,
   tabelaParticipacoes,
   tabelaUsuario,
@@ -13,6 +14,51 @@ import {
   tabelaParticipacoesAtividades,
 } from 'src/db/schema';
 import { and, eq, or, sql, SQL } from 'drizzle-orm';
+
+export interface EventoCertParaAssinar {
+  id: number;
+  arquivoPdf: string | null;
+  dataEmissao: Date;
+  participantName: string;
+  role: string;
+  eventName: string;
+  workloadHours: number | null;
+  location: string;
+  dataInicio: Date;
+  dataFim: Date;
+}
+
+export interface ConvidadoCertParaAssinar {
+  id: number;
+  arquivoPdf: string | null;
+  dataEmissao: Date;
+  guestName: string;
+  role: string;
+  eventName: string;
+  activityName: string;
+  workloadHours: number | null;
+  location: string;
+  dataInicio: Date;
+  dataFim: Date;
+}
+
+export interface DadosAssinatura {
+  assinadoEm: Date;
+  assinadoPor: number;
+  assinaturaNome: string;
+  codigoVerificacao: string;
+  hashVerificacao: string;
+}
+
+export interface CertificadoVerificado {
+  tipo: 'evento' | 'atividade' | 'convidado';
+  titular: string;
+  contexto: string; // nome do evento ou atividade
+  dataEmissao: Date;
+  assinadoEm: Date | null;
+  assinaturaNome: string | null;
+  hashVerificacao: string | null;
+}
 
 @Injectable()
 export class CertificateRepository {
@@ -302,5 +348,237 @@ export class CertificateRepository {
       .update(tabelaCertificadoEvento)
       .set({ arquivoPdf })
       .where(eq(tabelaCertificadoEvento.id, certificateId));
+  }
+
+  // ======================================================================
+  // Assinatura digital (lógica + carimbo/hash)
+  // ======================================================================
+
+  async findUsuarioNome(usuarioId: number): Promise<string | null> {
+    const [row] = await db
+      .select({ nome: tabelaUsuario.nome })
+      .from(tabelaUsuario)
+      .where(eq(tabelaUsuario.id, usuarioId));
+    return row?.nome ?? null;
+  }
+
+  /**
+   * Certificados de participante do evento para assinar, com os dados
+   * completos necessários para re-renderizar o PDF com a assinatura.
+   * @param incluirAssinados quando true, traz também os já assinados (reassinatura).
+   */
+  async findEventCertificatesToSign(
+    eventoId: number,
+    incluirAssinados = false,
+  ): Promise<EventoCertParaAssinar[]> {
+    const cond = incluirAssinados
+      ? eq(tabelaCertificadoEvento.eventoId, eventoId)
+      : and(
+          eq(tabelaCertificadoEvento.eventoId, eventoId),
+          eq(tabelaCertificadoEvento.assinado, false),
+        );
+    return db
+      .select({
+        id: tabelaCertificadoEvento.id,
+        arquivoPdf: tabelaCertificadoEvento.arquivoPdf,
+        dataEmissao: tabelaCertificadoEvento.dataEmissao,
+        participantName: tabelaUsuario.nome,
+        role: tabelaParticipacoes.tipo,
+        eventName: tabelaEvento.nome,
+        workloadHours: tabelaEvento.cargaHoraria,
+        location: tabelaEvento.localizacao,
+        dataInicio: tabelaEvento.dataInicio,
+        dataFim: tabelaEvento.dataFim,
+      })
+      .from(tabelaCertificadoEvento)
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaCertificadoEvento.usuarioId, tabelaUsuario.id),
+      )
+      .innerJoin(
+        tabelaEvento,
+        eq(tabelaCertificadoEvento.eventoId, tabelaEvento.id),
+      )
+      .innerJoin(
+        tabelaParticipacoes,
+        and(
+          eq(tabelaParticipacoes.usuarioId, tabelaCertificadoEvento.usuarioId),
+          eq(tabelaParticipacoes.eventoId, tabelaCertificadoEvento.eventoId),
+        ),
+      )
+      .where(cond);
+  }
+
+  /**
+   * Certificados de convidado (das atividades do evento) para assinar,
+   * com dados completos para re-renderizar o PDF com a assinatura.
+   */
+  async findGuestCertificatesToSign(
+    eventoId: number,
+    incluirAssinados = false,
+  ): Promise<ConvidadoCertParaAssinar[]> {
+    const cond = incluirAssinados
+      ? eq(tabelaAtividade.eventoId, eventoId)
+      : and(
+          eq(tabelaAtividade.eventoId, eventoId),
+          eq(tabelaCertificadoConvidado.assinado, false),
+        );
+    return db
+      .select({
+        id: tabelaCertificadoConvidado.id,
+        arquivoPdf: tabelaCertificadoConvidado.arquivoPdf,
+        dataEmissao: tabelaCertificadoConvidado.dataEmissao,
+        guestName: tabelaConvidado.nome,
+        role: tabelaConvidadoAtividade.funcao,
+        eventName: tabelaEvento.nome,
+        activityName: tabelaAtividade.nome,
+        workloadHours: tabelaAtividade.cargaHoraria,
+        location: tabelaAtividade.localizacao,
+        dataInicio: tabelaAtividade.dataInicio,
+        dataFim: tabelaAtividade.dataFim,
+      })
+      .from(tabelaCertificadoConvidado)
+      .innerJoin(
+        tabelaAtividade,
+        eq(tabelaCertificadoConvidado.atividadeId, tabelaAtividade.id),
+      )
+      .innerJoin(
+        tabelaEvento,
+        eq(tabelaAtividade.eventoId, tabelaEvento.id),
+      )
+      .innerJoin(
+        tabelaConvidado,
+        eq(tabelaCertificadoConvidado.convidadoId, tabelaConvidado.id),
+      )
+      .innerJoin(
+        tabelaConvidadoAtividade,
+        and(
+          eq(
+            tabelaConvidadoAtividade.convidadoId,
+            tabelaCertificadoConvidado.convidadoId,
+          ),
+          eq(
+            tabelaConvidadoAtividade.atividadeId,
+            tabelaCertificadoConvidado.atividadeId,
+          ),
+        ),
+      )
+      .where(cond);
+  }
+
+  async setEventCertificateSignature(id: number, dados: DadosAssinatura) {
+    await db
+      .update(tabelaCertificadoEvento)
+      .set({ assinado: true, ...dados })
+      .where(eq(tabelaCertificadoEvento.id, id));
+  }
+
+  async setActivityCertificateSignature(id: number, dados: DadosAssinatura) {
+    await db
+      .update(tabelaCertificadoAtividade)
+      .set({ assinado: true, ...dados })
+      .where(eq(tabelaCertificadoAtividade.id, id));
+  }
+
+  async setGuestCertificateSignature(id: number, dados: DadosAssinatura) {
+    await db
+      .update(tabelaCertificadoConvidado)
+      .set({ assinado: true, ...dados })
+      .where(eq(tabelaCertificadoConvidado.id, id));
+  }
+
+  private readonly resetFields = {
+    assinado: false,
+    assinadoEm: null,
+    assinadoPor: null,
+    assinaturaNome: null,
+    codigoVerificacao: null,
+    hashVerificacao: null,
+  };
+
+  /** Invalida a assinatura de um certificado de participante (usado na reemissão). */
+  async resetUserCertificateSignature(id: number) {
+    await db
+      .update(tabelaCertificadoEvento)
+      .set(this.resetFields)
+      .where(eq(tabelaCertificadoEvento.id, id));
+  }
+
+  /** Invalida a assinatura de um certificado de convidado (usado na reemissão). */
+  async resetGuestCertificateSignature(id: number) {
+    await db
+      .update(tabelaCertificadoConvidado)
+      .set(this.resetFields)
+      .where(eq(tabelaCertificadoConvidado.id, id));
+  }
+
+  /** Busca um certificado assinado pelo código público de verificação. */
+  async findByVerificationCode(
+    codigo: string,
+  ): Promise<CertificadoVerificado | null> {
+    const [evento] = await db
+      .select({
+        titular: tabelaUsuario.nome,
+        contexto: tabelaEvento.nome,
+        dataEmissao: tabelaCertificadoEvento.dataEmissao,
+        assinadoEm: tabelaCertificadoEvento.assinadoEm,
+        assinaturaNome: tabelaCertificadoEvento.assinaturaNome,
+        hashVerificacao: tabelaCertificadoEvento.hashVerificacao,
+      })
+      .from(tabelaCertificadoEvento)
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaCertificadoEvento.usuarioId, tabelaUsuario.id),
+      )
+      .innerJoin(
+        tabelaEvento,
+        eq(tabelaCertificadoEvento.eventoId, tabelaEvento.id),
+      )
+      .where(eq(tabelaCertificadoEvento.codigoVerificacao, codigo));
+    if (evento) return { tipo: 'evento', ...evento };
+
+    const [atividade] = await db
+      .select({
+        titular: tabelaUsuario.nome,
+        contexto: tabelaAtividade.nome,
+        dataEmissao: tabelaCertificadoAtividade.dataEmissao,
+        assinadoEm: tabelaCertificadoAtividade.assinadoEm,
+        assinaturaNome: tabelaCertificadoAtividade.assinaturaNome,
+        hashVerificacao: tabelaCertificadoAtividade.hashVerificacao,
+      })
+      .from(tabelaCertificadoAtividade)
+      .innerJoin(
+        tabelaUsuario,
+        eq(tabelaCertificadoAtividade.usuarioId, tabelaUsuario.id),
+      )
+      .innerJoin(
+        tabelaAtividade,
+        eq(tabelaCertificadoAtividade.atividadeId, tabelaAtividade.id),
+      )
+      .where(eq(tabelaCertificadoAtividade.codigoVerificacao, codigo));
+    if (atividade) return { tipo: 'atividade', ...atividade };
+
+    const [convidado] = await db
+      .select({
+        titular: tabelaConvidado.nome,
+        contexto: tabelaAtividade.nome,
+        dataEmissao: tabelaCertificadoConvidado.dataEmissao,
+        assinadoEm: tabelaCertificadoConvidado.assinadoEm,
+        assinaturaNome: tabelaCertificadoConvidado.assinaturaNome,
+        hashVerificacao: tabelaCertificadoConvidado.hashVerificacao,
+      })
+      .from(tabelaCertificadoConvidado)
+      .innerJoin(
+        tabelaConvidado,
+        eq(tabelaCertificadoConvidado.convidadoId, tabelaConvidado.id),
+      )
+      .innerJoin(
+        tabelaAtividade,
+        eq(tabelaCertificadoConvidado.atividadeId, tabelaAtividade.id),
+      )
+      .where(eq(tabelaCertificadoConvidado.codigoVerificacao, codigo));
+    if (convidado) return { tipo: 'convidado', ...convidado };
+
+    return null;
   }
 }

@@ -10,6 +10,9 @@ import { CertificateController } from './controller/certificate.controller';
 import { CertificateGuestController } from './controller/certificate-guest.controller';
 import { CertificateParticipantController } from './controller/certificate-participant.controller';
 import { CertificateDetailController } from './controller/certificate-detail.controller';
+import { CertificateSignatureService } from './signature/certificate-signature.service';
+import { CertificateSignatureController } from './signature/certificate-signature.controller';
+import { CertificateVerificationController } from './signature/certificate-verification.controller';
 
 @Module({
   imports: [AuthModule, SupabaseStorageModule],
@@ -19,11 +22,14 @@ import { CertificateDetailController } from './controller/certificate-detail.con
     CertificateParticipantController,
     CertificateMeController,
     CertificateDetailController,
+    CertificateSignatureController,
+    CertificateVerificationController,
   ],
   providers: [
     CertificateService,
     CertificateRepository,
     CertificateFileStorageService,
+    CertificateSignatureService,
   ],
 })
 export class CertificateModule {}
