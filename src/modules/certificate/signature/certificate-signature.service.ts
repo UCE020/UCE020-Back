@@ -119,7 +119,23 @@ export class CertificateSignatureService {
         },
       });
 
-      await this.fileStorage.overwriteCertificatePdf(cert.arquivoPdf, pdf);
+      // Supabase gera um objeto novo a cada upload: subimos o PDF assinado,
+      // atualizamos a URL no banco e removemos o arquivo antigo do bucket.
+      const novaUrl = await this.fileStorage.saveParticipantCertificatePdf(
+        cert.id,
+        cert.eventName,
+        cert.participantName,
+        pdf,
+      );
+      try {
+        await this.repo.setUserCertificateFile(cert.id, novaUrl);
+      } catch (error) {
+        await this.fileStorage.remove(novaUrl);
+        throw error;
+      }
+      if (cert.arquivoPdf && cert.arquivoPdf !== novaUrl) {
+        await this.fileStorage.remove(cert.arquivoPdf);
+      }
       await this.repo.setEventCertificateSignature(cert.id, {
         assinadoEm,
         assinadoPor: userId,
@@ -171,7 +187,21 @@ export class CertificateSignatureService {
         },
       });
 
-      await this.fileStorage.overwriteCertificatePdf(cert.arquivoPdf, pdf);
+      const novaUrl = await this.fileStorage.saveGuestCertificatePdf(
+        cert.id,
+        cert.guestName,
+        cert.activityName,
+        pdf,
+      );
+      try {
+        await this.repo.setGuestCertificateFile(cert.id, novaUrl);
+      } catch (error) {
+        await this.fileStorage.remove(novaUrl);
+        throw error;
+      }
+      if (cert.arquivoPdf && cert.arquivoPdf !== novaUrl) {
+        await this.fileStorage.remove(cert.arquivoPdf);
+      }
       await this.repo.setGuestCertificateSignature(cert.id, {
         assinadoEm,
         assinadoPor: userId,
