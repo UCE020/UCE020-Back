@@ -76,7 +76,20 @@ export class UserProfileController {
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
   async updateAvatar(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+    const currentUser = await this.userService.getUser(req.user.sub);
     const avatarUrl = await this.avatarStorage.save(req.user.sub, file);
-    return this.userService.updateAvatar(req.user.sub, avatarUrl);
+
+    try {
+      const updatedUser = await this.userService.updateAvatar(req.user.sub, avatarUrl);
+
+      if (currentUser.avatarUrl && currentUser.avatarUrl !== avatarUrl) {
+        await this.avatarStorage.remove(currentUser.avatarUrl);
+      }
+
+      return updatedUser;
+    } catch (error) {
+      await this.avatarStorage.remove(avatarUrl);
+      throw error;
+    }
   }
 }

@@ -7,14 +7,19 @@ import {
   Param,
   Delete,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   Query,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { ActivityService } from './activity.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -22,15 +27,23 @@ import { UpdateActivityDto } from './dto/update-acitivity.dto';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
 import type { RequestWithUser } from 'src/common/types/request-with-user.type';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { SupabaseStorageService } from 'src/common/storage/supabase-storage.service';
+import 'multer';
 
 @ApiTags('activity')
 @ApiBearerAuth()
 @Controller('activity')
 @UseGuards(JwtAuthGuard)
 export class ActivityController {
-  constructor(private readonly activityService: ActivityService) {}
+  constructor(
+    private readonly activityService: ActivityService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
   @Post()
+  @UseInterceptors(FileInterceptor('foto'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateActivityDto })
   @ApiOperation({ summary: 'Criar uma nova atividade para um evento' })
   @ApiResponse({ status: 201, description: 'Atividade criada com sucesso.' })
   @ApiResponse({ status: 400, description: 'Dados de entrada inválidos.' })
@@ -38,14 +51,43 @@ export class ActivityController {
     status: 403,
     description: 'Apenas organizadores podem realizar esta ação.',
   })
-  create(
+  async create(
     @Body() createActivityDto: CreateActivityDto,
+    @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    return this.activityService.create({
-      dto: createActivityDto,
-      userId: req.user.sub,
-    });
+    await this.activityService.assertAuthenticatedUserExists(req.user.sub);
+
+    let uploadedPhotoUrl: string | undefined;
+
+    if (file) {
+      uploadedPhotoUrl = await this.storage.uploadMulterFile(
+        'Atividades',
+        file,
+        req.user.sub,
+      );
+      createActivityDto.foto = uploadedPhotoUrl;
+    } else if (createActivityDto.foto?.startsWith('data:')) {
+      uploadedPhotoUrl = await this.storage.uploadDataUrl(
+        'Atividades',
+        createActivityDto.foto,
+        req.user.sub,
+      );
+      createActivityDto.foto = uploadedPhotoUrl;
+    }
+
+    try {
+      return await this.activityService.create({
+        dto: createActivityDto,
+        userId: req.user.sub,
+      });
+    } catch (error) {
+      if (uploadedPhotoUrl) {
+        await this.storage.tryRemoveByPublicUrl(uploadedPhotoUrl);
+      }
+
+      throw error;
+    }
   }
 
   @Get()
@@ -105,6 +147,9 @@ export class ActivityController {
   }
 
   @Patch(':id')
+  @UseInterceptors(FileInterceptor('foto'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateActivityDto })
   @ApiOperation({ summary: 'Atualizar os dados de uma atividade' })
   @ApiResponse({
     status: 200,
@@ -115,16 +160,45 @@ export class ActivityController {
     description: 'Apenas organizadores podem realizar esta ação.',
   })
   @ApiResponse({ status: 404, description: 'Atividade não encontrada.' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateActivityDto: UpdateActivityDto,
+    @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    return this.activityService.update({
-      id: +id,
-      dto: updateActivityDto,
-      userId: req.user.sub,
-    });
+    await this.activityService.assertAuthenticatedUserExists(req.user.sub);
+
+    let uploadedPhotoUrl: string | undefined;
+
+    if (file) {
+      uploadedPhotoUrl = await this.storage.uploadMulterFile(
+        'Atividades',
+        file,
+        id,
+      );
+      updateActivityDto.foto = uploadedPhotoUrl;
+    } else if (updateActivityDto.foto?.startsWith('data:')) {
+      uploadedPhotoUrl = await this.storage.uploadDataUrl(
+        'Atividades',
+        updateActivityDto.foto,
+        id,
+      );
+      updateActivityDto.foto = uploadedPhotoUrl;
+    }
+
+    try {
+      return await this.activityService.update({
+        id: +id,
+        dto: updateActivityDto,
+        userId: req.user.sub,
+      });
+    } catch (error) {
+      if (uploadedPhotoUrl) {
+        await this.storage.tryRemoveByPublicUrl(uploadedPhotoUrl);
+      }
+
+      throw error;
+    }
   }
 
   @Delete(':id')

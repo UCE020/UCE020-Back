@@ -4,6 +4,7 @@ import { CertificateService } from './certificate.service';
 import { AuthModule } from '../auth/auth.module';
 import { CertificateRepository } from './repository/certificate.respository';
 import { CertificateFileStorageService } from './storage/certificate-file-storage.service';
+import { SupabaseStorageModule } from 'src/common/storage/supabase-storage.module';
 import { CertificateMeController } from './controller/certificate-me.controller';
 import { CertificateController } from './controller/certificate.controller';
 import { CertificateGuestController } from './controller/certificate-guest.controller';
@@ -11,7 +12,7 @@ import { CertificateParticipantController } from './controller/certificate-parti
 import { CertificateDetailController } from './controller/certificate-detail.controller';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SupabaseStorageModule],
   controllers: [
     CertificateController,
     CertificateGuestController,

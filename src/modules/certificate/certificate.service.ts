@@ -87,7 +87,14 @@ export class CertificateService {
     const existing =
       await this.repo.findExistingGuestCertificatesByActivity(atividadeId);
     const existingByConvidadoId = new Map(
-      existing.map((cert) => [cert.convidadoId, cert]),
+      existing
+        .filter((cert) => cert.arquivoPdf)
+        .map((cert) => [cert.convidadoId, cert]),
+    );
+    const existingWithoutFileByConvidadoId = new Map(
+      existing
+        .filter((cert) => !cert.arquivoPdf)
+        .map((cert) => [cert.convidadoId, cert]),
     );
     const pending = guests.filter(
       (guest) => !existingByConvidadoId.has(guest.convidadoId),
@@ -95,18 +102,25 @@ export class CertificateService {
 
     const dataEmissao = new Date();
     const created = await this.repo.insertGuestCertificates(
-      pending.map((guest) => ({
-        convidadoId: guest.convidadoId,
-        atividadeId,
-        dataEmissao,
-      })),
+      pending
+        .filter(
+          (guest) =>
+            !existingWithoutFileByConvidadoId.has(guest.convidadoId),
+        )
+        .map((guest) => ({
+          convidadoId: guest.convidadoId,
+          atividadeId,
+          dataEmissao,
+        })),
     );
     const createdByConvidadoId = new Map(
       created.map((cert) => [cert.convidadoId, cert]),
     );
 
     for (const guest of pending) {
-      const cert = createdByConvidadoId.get(guest.convidadoId);
+      const cert =
+        existingWithoutFileByConvidadoId.get(guest.convidadoId) ??
+        createdByConvidadoId.get(guest.convidadoId);
       if (!cert) continue;
 
       const pdf = await renderGuestCertificatePdf({
@@ -130,18 +144,24 @@ export class CertificateService {
         atividade.nome,
         pdf,
       );
-      await this.repo.setGuestCertificateFile(cert.id, fileUrl);
+      try {
+        await this.repo.setGuestCertificateFile(cert.id, fileUrl);
+      } catch (error) {
+        await this.fileStorage.remove(fileUrl);
+        throw error;
+      }
       cert.arquivoPdf = fileUrl;
     }
 
     return {
-      message: `${created.length} certificado(s) de convidado emitido(s).`,
+      message: `${pending.length} certificado(s) de convidado emitido(s).`,
       data: {
-        issued: created.length,
-        alreadyIssued: existing.length,
+        issued: pending.length,
+        alreadyIssued: existingByConvidadoId.size,
         certificates: guests.map((guest) => {
           const cert =
             createdByConvidadoId.get(guest.convidadoId) ??
+            existingWithoutFileByConvidadoId.get(guest.convidadoId) ??
             existingByConvidadoId.get(guest.convidadoId)!;
 
           return {
@@ -182,7 +202,14 @@ export class CertificateService {
     const existing =
       await this.repo.findExistingUserCertificatesByEvent(eventoId);
     const existingByUsuarioId = new Map(
-      existing.map((cert) => [cert.usuarioId, cert]),
+      existing
+        .filter((cert) => cert.arquivoPdf)
+        .map((cert) => [cert.usuarioId, cert]),
+    );
+    const existingWithoutFileByUsuarioId = new Map(
+      existing
+        .filter((cert) => !cert.arquivoPdf)
+        .map((cert) => [cert.usuarioId, cert]),
     );
     const pending = participacoes.filter(
       (participacao) => !existingByUsuarioId.has(participacao.usuarioId),
@@ -190,18 +217,25 @@ export class CertificateService {
 
     const dataEmissao = new Date();
     const created = await this.repo.insertUserCertificates(
-      pending.map((participacao) => ({
-        usuarioId: participacao.usuarioId,
-        eventoId,
-        dataEmissao,
-      })),
+      pending
+        .filter(
+          (participacao) =>
+            !existingWithoutFileByUsuarioId.has(participacao.usuarioId),
+        )
+        .map((participacao) => ({
+          usuarioId: participacao.usuarioId,
+          eventoId,
+          dataEmissao,
+        })),
     );
     const createdByUsuarioId = new Map(
       created.map((cert) => [cert.usuarioId, cert]),
     );
 
     for (const participacao of pending) {
-      const cert = createdByUsuarioId.get(participacao.usuarioId);
+      const cert =
+        existingWithoutFileByUsuarioId.get(participacao.usuarioId) ??
+        createdByUsuarioId.get(participacao.usuarioId);
       if (!cert) continue;
 
       const pdf = await renderParticipantCertificatePdf({
@@ -224,18 +258,24 @@ export class CertificateService {
         participacao.nome,
         pdf,
       );
-      await this.repo.setUserCertificateFile(cert.id, fileUrl);
+      try {
+        await this.repo.setUserCertificateFile(cert.id, fileUrl);
+      } catch (error) {
+        await this.fileStorage.remove(fileUrl);
+        throw error;
+      }
       cert.arquivoPdf = fileUrl;
     }
 
     return {
-      message: `${created.length} certificado(s) emitido(s).`,
+      message: `${pending.length} certificado(s) emitido(s).`,
       data: {
-        issued: created.length,
-        alreadyIssued: existing.length,
+        issued: pending.length,
+        alreadyIssued: existingByUsuarioId.size,
         certificates: participacoes.map((participacao) => {
           const cert =
             createdByUsuarioId.get(participacao.usuarioId) ??
+            existingWithoutFileByUsuarioId.get(participacao.usuarioId) ??
             existingByUsuarioId.get(participacao.usuarioId)!;
 
           return {

@@ -76,6 +76,11 @@ export class CreateActivityDto {
   @Min(1, { message: 'O ID do evento é inválido.' })
   eventId!: number;
 
+  @ApiPropertyOptional({ example: 'https://example.com/activity.png' })
+  @IsString({ message: 'A foto deve ser uma string.' })
+  @IsOptional()
+  foto?: string;
+
   @ApiPropertyOptional({ type: [CreateGuestDto] })
   @IsArray({ message: 'Os convidados devem ser uma lista.' })
   @IsOptional()
