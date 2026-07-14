@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src/db';
@@ -14,11 +15,28 @@ import {
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { FindAllActivitiesDto } from './dto/find-activities.dto';
 import { UpdateActivityDto } from './dto/update-acitivity.dto';
+import { SupabaseStorageService } from 'src/common/storage/supabase-storage.service';
 
 @Injectable()
 export class ActivityService {
+  constructor(private readonly storage: SupabaseStorageService) {}
+
+  async assertAuthenticatedUserExists(userId: number): Promise<void> {
+    const [user] = await db
+      .select({ id: tabelaUsuario.id })
+      .from(tabelaUsuario)
+      .where(eq(tabelaUsuario.id, userId))
+      .limit(1);
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Usuario autenticado nao existe no banco. Faca login novamente.',
+      );
+    }
+  }
+
   async create({ dto, userId }: { dto: CreateActivityDto; userId: number }) {
-    void userId;
+    await this.assertAuthenticatedUserExists(userId);
 
     const createdActivities = await db
       .insert(tabelaAtividade)
@@ -31,6 +49,7 @@ export class ActivityService {
         categoria: dto.category,
         cargaHoraria: dto.workload ?? 0,
         status: 'pendente',
+        foto: dto.foto,
         eventoId: dto.eventId,
       })
       .returning();
@@ -325,7 +344,7 @@ export class ActivityService {
     dto: UpdateActivityDto;
     userId: number;
   }) {
-    void userId;
+    await this.assertAuthenticatedUserExists(userId);
 
     const activities = await db
       .select()
@@ -350,6 +369,7 @@ export class ActivityService {
           ? new Date(dto.startDate)
           : currentActivity.dataInicio,
         dataFim: dto.endDate ? new Date(dto.endDate) : currentActivity.dataFim,
+        foto: dto.foto ?? currentActivity.foto,
       })
       .where(eq(tabelaAtividade.id, id))
       .returning();
@@ -358,6 +378,14 @@ export class ActivityService {
 
     if (!updatedActivity) {
       throw new BadRequestException('Não foi possível atualizar a atividade');
+    }
+
+    if (
+      dto.foto &&
+      currentActivity.foto &&
+      dto.foto !== currentActivity.foto
+    ) {
+      await this.storage.tryRemoveByPublicUrl(currentActivity.foto);
     }
 
     return {
@@ -381,6 +409,8 @@ export class ActivityService {
     }
 
     await db.delete(tabelaAtividade).where(eq(tabelaAtividade.id, id));
+
+    await this.storage.tryRemoveByPublicUrl(activity.foto);
 
     return {
       success: true,

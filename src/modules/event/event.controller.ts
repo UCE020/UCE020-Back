@@ -10,13 +10,18 @@ import {
   UnauthorizedException,
   Query,
   BadRequestException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { EventService } from './event.service';
 import type { TipoParticipante } from './event.service';
@@ -26,6 +31,8 @@ import { UpdateMemberDto } from './dto/update-member.dto';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import type { JwtPayload } from 'src/common/types/jwt-payload.type';
 import { User } from 'src/common/decorators/usuario.decorator';
+import { SupabaseStorageService } from 'src/common/storage/supabase-storage.service';
+import 'multer';
 
 const TIPOS_PARTICIPANTE: TipoParticipante[] = [
   'participante',
@@ -36,11 +43,17 @@ const TIPOS_PARTICIPANTE: TipoParticipante[] = [
 @ApiTags('event')
 @Controller('event')
 export class EventController {
-  constructor(private readonly eventService: EventService) {}
+  constructor(
+    private readonly eventService: EventService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('foto'))
   @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateEventDto })
   @ApiOperation({ summary: 'Criar novo evento' })
   @ApiResponse({ status: 201, description: 'Evento criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
@@ -50,10 +63,39 @@ export class EventController {
   })
   async create(
     @Body() createEventDto: CreateEventDto,
+    @UploadedFile() file: Express.Multer.File,
     @User() user: JwtPayload,
   ) {
     const userId = Number(user.sub);
-    return await this.eventService.create(createEventDto, userId);
+    await this.eventService.assertAuthenticatedUserExists(userId);
+
+    let uploadedPhotoUrl: string | undefined;
+
+    if (file) {
+      uploadedPhotoUrl = await this.storage.uploadMulterFile(
+        'Evento',
+        file,
+        userId,
+      );
+      createEventDto.foto = uploadedPhotoUrl;
+    } else if (createEventDto.foto?.startsWith('data:')) {
+      uploadedPhotoUrl = await this.storage.uploadDataUrl(
+        'Evento',
+        createEventDto.foto,
+        userId,
+      );
+      createEventDto.foto = uploadedPhotoUrl;
+    }
+
+    try {
+      return await this.eventService.create(createEventDto, userId);
+    } catch (error) {
+      if (uploadedPhotoUrl) {
+        await this.storage.tryRemoveByPublicUrl(uploadedPhotoUrl);
+      }
+
+      throw error;
+    }
   }
 
   @Get()
@@ -120,7 +162,10 @@ export class EventController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('foto'))
   @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateEventDto })
   @ApiOperation({ summary: 'Atualizar evento pelo ID' })
   @ApiResponse({ status: 200, description: 'Evento atualizado com sucesso' })
   @ApiResponse({ status: 400, description: 'Evento já está finalizado' })
@@ -132,10 +177,39 @@ export class EventController {
   async update(
     @Param('id') id: string,
     @Body() updateEventDto: UpdateEventDto,
+    @UploadedFile() file: Express.Multer.File,
     @User() user: JwtPayload,
   ) {
     const userId = Number(user.sub);
-    return await this.eventService.update(+id, updateEventDto, userId);
+    await this.eventService.assertAuthenticatedUserExists(userId);
+
+    let uploadedPhotoUrl: string | undefined;
+
+    if (file) {
+      uploadedPhotoUrl = await this.storage.uploadMulterFile(
+        'Evento',
+        file,
+        id,
+      );
+      updateEventDto.foto = uploadedPhotoUrl;
+    } else if (updateEventDto.foto?.startsWith('data:')) {
+      uploadedPhotoUrl = await this.storage.uploadDataUrl(
+        'Evento',
+        updateEventDto.foto,
+        id,
+      );
+      updateEventDto.foto = uploadedPhotoUrl;
+    }
+
+    try {
+      return await this.eventService.update(+id, updateEventDto, userId);
+    } catch (error) {
+      if (uploadedPhotoUrl) {
+        await this.storage.tryRemoveByPublicUrl(uploadedPhotoUrl);
+      }
+
+      throw error;
+    }
   }
 
   @Patch(':id/finalizar')

@@ -17,6 +17,13 @@ export type ParticipantCertificateData = {
   assinante1Titulo?: string;
   assinante2Nome?:   string;
   assinante2Titulo?: string;
+  // Dados da assinatura digital (preenchidos no ato da assinatura).
+  assinatura?: {
+    nome:   string;
+    data:   string; // data/hora formatada
+    codigo: string;
+    qr?:    { data: Buffer; format: 'png' };
+  };
 };
 
 const ROLE_CERT_TITLE: Record<string, string> = {
@@ -101,26 +108,22 @@ function buildDocument(data: ParticipantCertificateData) {
           ),
         ),
 
-        // Assinaturas
-        e(View, { style: styles.signaturesSection },
-          e(View, { style: styles.signatureBlock },
-            e(View, { style: styles.signatureLine }),
-            e(Text, { style: styles.signatureNameSpace },
-              data.assinante1Nome ?? ' ',
-            ),
-            e(Text, { style: styles.signatureTitle },
-              data.assinante1Titulo ?? ' ',
-            ),
-          ),
-          e(View, { style: styles.signatureBlock },
-            e(View, { style: styles.signatureLine }),
-            e(Text, { style: styles.signatureNameSpace },
-              data.assinante2Nome ?? ' ',
-            ),
-            e(Text, { style: styles.signatureTitle },
-              data.assinante2Titulo ?? ' ',
-            ),
-          ),
+        // Assinatura digital centralizada (onde antes ficavam as linhas).
+        e(View, { style: styles.signatureArea },
+          data.assinatura
+            ? e(View, { style: styles.signatureStamp },
+                data.assinatura.qr
+                  ? e(Image, { src: data.assinatura.qr, style: styles.signatureQr })
+                  : null,
+                e(View, { style: styles.signatureInfo },
+                  e(Image, { src: LOGO_ASSINAE_SRC, style: styles.signatureLogo }),
+                  e(Text, { style: styles.signatureLabel }, 'Assinado digitalmente por'),
+                  e(Text, { style: styles.signatureName },  data.assinatura.nome),
+                  e(Text, { style: styles.signatureDate },  `em ${data.assinatura.data}`),
+                  e(Text, { style: styles.signatureCode },  `Código de verificação: ${data.assinatura.codigo}`),
+                ),
+              )
+            : null,
         ),
 
         // Apoio (fixa) — logo UEFS
