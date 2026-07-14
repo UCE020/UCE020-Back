@@ -12,7 +12,7 @@ import {
   tabelaEvento,
   tabelaParticipacoesAtividades,
 } from 'src/db/schema';
-import { and, eq, sql, SQL } from 'drizzle-orm';
+import { and, eq, or, sql, SQL } from 'drizzle-orm';
 
 @Injectable()
 export class CertificateRepository {
@@ -258,14 +258,21 @@ export class CertificateRepository {
         tabelaUsuario,
         eq(tabelaParticipacoes.usuarioId, tabelaUsuario.id),
       )
-      .innerJoin(
+      .leftJoin(
         tabelaParticipacoesAtividades,
         eq(tabelaParticipacoes.id, tabelaParticipacoesAtividades.participacaoId),
       )
       .where(
         and(
           eq(tabelaParticipacoes.eventoId, eventoId),
-          eq(tabelaParticipacoesAtividades.presente, true), 
+          or(
+            and(
+              eq(tabelaParticipacoes.tipo, 'participante'),
+              eq(tabelaParticipacoesAtividades.presente, true),
+            ),
+            eq(tabelaParticipacoes.tipo, 'organizador'),
+            eq(tabelaParticipacoes.tipo, 'monitor')
+          )
         )
       )
       .groupBy(

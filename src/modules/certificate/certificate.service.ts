@@ -22,12 +22,6 @@ export class CertificateService {
   async getCertificatesByEvent(eventoId: number, page: number, limit: number) {
     const rows = await this.repo.findByEvent(eventoId, page, limit);
 
-    if (!rows.length) {
-      throw new NotFoundException(
-        'Nenhum certificado encontrado para este evento',
-      );
-    }
-
     return rows.map((row) => this.toCertificateDto(row));
   }
 
