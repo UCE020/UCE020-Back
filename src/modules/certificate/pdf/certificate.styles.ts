@@ -217,44 +217,64 @@ export const certificateStyles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
-  // Assinaturas
-  signaturesSection: {
+  // Assinatura digital — área central reservada (onde antes ficavam as linhas).
+  // Quando o certificado é assinado, o bloco abaixo é renderizado centralizado.
+  signatureArea: {
     width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 40,
-    marginTop: 40, 
-  },
-
-  signatureBlock: {
+    height: 96,
+    marginTop: 28,
     alignItems: 'center',
-    width: 200,
+    justifyContent: 'center',
   },
 
-  signatureLine: {
-    width: 180,
-    height: 1,
-    backgroundColor: '#0F1D35',
-    marginBottom: 10, 
+  // Bloco de assinatura centralizado: QR + (logo, "assinado por", nome, data, código)
+  signatureStamp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
   },
 
-  signatureNameSpace: {
-    fontSize: 9,
-    fontWeight: 400,
-    color: '#94A3B8',
-    textAlign: 'center',
-    fontStyle: 'italic',
+  signatureQr: {
+    width: 64,
+    height: 64,
+    objectFit: 'contain',
+  },
+
+  signatureInfo: {
+    alignItems: 'flex-start',
+  },
+
+  signatureLogo: {
+    width: 82,
+    height: 26,
+    objectFit: 'contain',
     marginBottom: 3,
-    lineHeight: 1.4,
   },
 
-  signatureTitle: {
-    fontSize: 8,
+  signatureLabel: {
+    fontSize: 7.5,
+    fontWeight: 400,
+    color: '#64748B',
+  },
+
+  signatureName: {
+    fontSize: 12,
     fontWeight: 700,
     color: '#0F1D35',
-    textAlign: 'center',
-    lineHeight: 1.5,
+    lineHeight: 1.3,
+  },
+
+  signatureDate: {
+    fontSize: 8.5,
+    fontWeight: 400,
+    color: '#64748B',
+  },
+
+  signatureCode: {
+    fontSize: 7.5,
+    fontWeight: 400,
+    color: '#94A3B8',
   },
 
   // Seção fixa de Apoio (logo UEFS)

@@ -19,7 +19,7 @@ export class CertificateFileStorageService {
     const safeEvent = this.sanitizeFilename(eventName);
 
     const filename = `Certificado ${safeName} - ${safeEvent} - ${certificateId}.pdf`;
-    
+
     return this.save(filename, pdf);
   }
 
@@ -33,7 +33,7 @@ export class CertificateFileStorageService {
     const safeEvent = this.sanitizeFilename(eventName);
 
     const filename = `Certificado Convidado ${safeName} - ${safeEvent} - ${certificateId}.pdf`;
-    
+
     return this.save(filename, pdf);
   }
 

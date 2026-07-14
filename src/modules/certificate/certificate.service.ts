@@ -63,7 +63,11 @@ export class CertificateService {
     }));
   }
 
-  async generateGuestCertificates(atividadeId: number, userId: number) {
+  async generateGuestCertificates(
+    atividadeId: number,
+    userId: number,
+    force = false,
+  ) {
     const atividade = await this.repo.findActivityForCertificate(atividadeId);
     if (!atividade) {
       throw new NotFoundException('Atividade não encontrada.');
@@ -133,9 +137,9 @@ export class CertificateService {
         location: atividade.localizacao,
         eventDate: formatDateRange(atividade.dataInicio, atividade.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   atividade.assinante1Nome ?? undefined,   
-        assinante1Titulo: atividade.assinante1Titulo ?? undefined, 
-        assinante2Nome:   atividade.assinante2Nome ?? undefined,   
+        assinante1Nome:   atividade.assinante1Nome ?? undefined,
+        assinante1Titulo: atividade.assinante1Titulo ?? undefined,
+        assinante2Nome:   atividade.assinante2Nome ?? undefined,
         assinante2Titulo: atividade.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveGuestCertificatePdf(
@@ -178,7 +182,11 @@ export class CertificateService {
     };
   }
 
-  async generateParticipantCertificates(eventoId: number, userId: number) {
+  async generateParticipantCertificates(
+    eventoId: number,
+    userId: number,
+    force = false,
+  ) {
     const evento = await this.repo.findEventForCertificate(eventoId);
     if (!evento) {
       throw new NotFoundException('Evento não encontrado.');
@@ -247,9 +255,9 @@ export class CertificateService {
         location: evento.localizacao,
         eventDate: formatDateRange(evento.dataInicio, evento.dataFim),
         issueDate: cert.dataEmissao,
-        assinante1Nome:   evento.assinante1Nome ?? undefined,   
-        assinante1Titulo: evento.assinante1Titulo ?? undefined, 
-        assinante2Nome:   evento.assinante2Nome ?? undefined,   
+        assinante1Nome:   evento.assinante1Nome ?? undefined,
+        assinante1Titulo: evento.assinante1Titulo ?? undefined,
+        assinante2Nome:   evento.assinante2Nome ?? undefined,
         assinante2Titulo: evento.assinante2Titulo ?? undefined,
       });
       const fileUrl = await this.fileStorage.saveParticipantCertificatePdf(
