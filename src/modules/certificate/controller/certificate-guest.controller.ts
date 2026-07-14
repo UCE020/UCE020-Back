@@ -3,9 +3,7 @@ import {
   Controller,
   Post,
   Param,
-  Query,
   ParseIntPipe,
-  ParseBoolPipe,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,7 +15,6 @@ import {
   ApiNotFoundResponse,
   ApiForbiddenResponse,
   ApiUnauthorizedResponse,
-  ApiQuery,
 } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/common/types/request-with-user.type';
 import { CertificateService } from '../certificate.service';
@@ -46,22 +43,13 @@ export class CertificateGuestController {
       'Apenas organizadores podem emitir certificados, e apenas de atividades finalizadas.',
   })
   @ApiUnauthorizedResponse({ description: 'Token ausente ou inválido' })
-  @ApiQuery({
-    name: 'force',
-    required: false,
-    type: Boolean,
-    description:
-      'Se true, regera o PDF dos certificados já existentes (novo layout) e invalida a assinatura anterior.',
-  })
   generateGuestCertificates(
     @Param('atividadeId', ParseIntPipe) atividadeId: number,
     @Req() req: RequestWithUser,
-    @Query('force', new ParseBoolPipe({ optional: true })) force = false,
   ) {
     return this.certificateService.generateGuestCertificates(
       atividadeId,
       req.user.sub,
-      force,
     );
   }
 }

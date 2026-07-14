@@ -115,18 +115,6 @@ Resposta:
 
 Erros: `403` (não é organizador), `404` (nada pendente), `401` (sem token).
 
-### Reemitir certificados (protegido — só organizador)
-
-Regera o PDF de certificados **já existentes** com o layout novo e invalida a
-assinatura anterior (para você poder reassinar em seguida):
-
-```
-POST /api/v1/event/:eventoId/certificate/participants?force=true
-POST /api/v1/activity/:atividadeId/certificate/guests?force=true
-```
-
-Sem `force`, o comportamento é o de antes (só emite os que ainda não existem).
-
 ### Verificar um certificado (público)
 
 ```
@@ -213,8 +201,5 @@ Certificados emitidos/assinados **antes** dessa mudança têm o layout antigo
 reconstruído (`npm install` + `npm run build`/restart):
 
 1. Reassine em lote: `POST /event/:eventoId/certificate/sign?force=true` — como a
-   assinatura **regera o PDF do zero**, isso já produz o certificado novo, limpo,
-   com a assinatura centralizada (sem resquício do carimbo antigo).
-
-Se quiser apenas deixá‑los como "não assinados" com o layout novo, use a
-reemissão forçada (`participants?force=true`) e depois assine normalmente.
+   assinatura **regera o PDF do zero** (novo upload no Supabase + troca da URL),
+   isso já produz o certificado novo, limpo, com a assinatura centralizada.

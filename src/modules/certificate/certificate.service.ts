@@ -63,11 +63,7 @@ export class CertificateService {
     }));
   }
 
-  async generateGuestCertificates(
-    atividadeId: number,
-    userId: number,
-    force = false,
-  ) {
+  async generateGuestCertificates(atividadeId: number, userId: number) {
     const atividade = await this.repo.findActivityForCertificate(atividadeId);
     if (!atividade) {
       throw new NotFoundException('Atividade não encontrada.');
@@ -182,11 +178,7 @@ export class CertificateService {
     };
   }
 
-  async generateParticipantCertificates(
-    eventoId: number,
-    userId: number,
-    force = false,
-  ) {
+  async generateParticipantCertificates(eventoId: number, userId: number) {
     const evento = await this.repo.findEventForCertificate(eventoId);
     if (!evento) {
       throw new NotFoundException('Evento não encontrado.');
