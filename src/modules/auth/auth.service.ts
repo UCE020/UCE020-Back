@@ -64,17 +64,24 @@ export class AuthService {
         email: tabelaUsuario.email,
       });
 
+    const link = `${this.configService.get<string>('FRONTEND_URL')}/register?step=code&email=${encodeURIComponent(registerDto.email)}`;
+
     await this.mailerService.sendMail({
       to: registerDto.email,
       subject: 'Confirme seu cadastro - Assinaê',
       html: `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2>Bem-vindo ao Assinaê!</h2>
-        <p>Seu código de confirmação é:</p>
-        <h1 style="letter-spacing: 5px; color: #4F46E5;">${verificationCode}</h1>
-        <p>Este código expira em 15 minutos.</p>
-      </div>
-    `,
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h2>Bem-vindo ao Assinaê!</h2>
+          <p>Seu código de confirmação é:</p>
+          <h1 style="letter-spacing: 5px; color: #4F46E5;">${verificationCode}</h1>
+          <p>Este código expira em 15 minutos.</p>
+          <p>
+            <a href="${link}" style="color: #4F46E5;">
+              Clique aqui para confirmar
+            </a>
+          </p>
+        </div>
+      `,
     });
 
     return {
@@ -150,7 +157,7 @@ export class AuthService {
       .where(eq(tabelaUsuario.id, user.id));
 
     const frontUrl = this.configService.get<string>('FRONTEND_URL');
-    const resetLink = `${frontUrl}/reset-password?token=${token}`;
+    const resetLink = `${frontUrl}/redefine-password?token=${token}`;
 
     await this.mailerService.sendMail({
       to: user.email,
